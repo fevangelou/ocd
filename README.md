@@ -61,6 +61,11 @@ For the Exposé:
 - Provide text assistance like 'Close with "Esc" key or hover your mouse on the top/right corner'
 - Add option to choose the corner that triggers Exposé on your desktop
 
+For the Window Controls:
+- Consider +, - & inside each respective control (or as an option to toggle in the settings popup)
+- Tooltip when hovering on each control
+- Consider "double-click on window title" action to maximize/restore window size
+
 ## Installation
 
 Recommended — preview first, no changes made:
