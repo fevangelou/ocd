@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.fevangelou.ocd",
+  "name": "Classic Desktop for Omarchy (OCD)",
+  "version": "1.0",
+  "author": "Fotis Evangelou",
+  "license": "GPL-3.0",
+  "description": "A plugin/mod to ease the transition from 'traditional' desktops (Windows, MacOS, Gnome, KDE etc.), while respecting Omarchy's desktop paradigm",
+  "kinds": ["service", "overlay", "panel", "bar-widget"],
+  "entryPoints": {
+    "service": "plugin/dock/Dock.qml",
+    "overlay": "plugin/expose/Expose.qml",
+    "panel": "plugin/settings/Settings.qml",
+    "barWidget": "plugin/settings/SettingsBarWidget.qml"
+  }
+}
