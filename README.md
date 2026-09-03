@@ -157,8 +157,9 @@ For the Exposé:
 - Add option to choose the corner that triggers Exposé on your desktop
 
 For the Window Controls:
-- Consider +, - & inside each respective control (or as an option to toggle in the settings popup)
 - Tooltip when hovering on each control
+- Consider +, - & inside each respective control (or as an option to toggle in the settings popup)
+- Consider 4th control for allowing the window to float
 - Consider "double-click on window title" action to maximize/restore window size
 
 Global:
