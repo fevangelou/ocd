@@ -9,7 +9,9 @@
 #  */
 
 # ocd installer. Run from a checked-out copy of the repo (boot.sh clones one
-# and execs this). Safe to re-run: every step is idempotent.
+# and execs this, and so does `ocd update` from a newer release). Safe to
+# re-run: every step is idempotent, and an existing features.json is left
+# untouched unless --features is given explicitly.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
@@ -42,6 +44,8 @@ source "$LIB_DIR/backup.sh"
 source "$LIB_DIR/shellplugins.sh"
 # shellcheck source=lib/hyprbars.sh
 source "$LIB_DIR/hyprbars.sh"
+# shellcheck source=lib/update.sh
+source "$LIB_DIR/update.sh"
 
 FORCE=0
 FEATURES_ARG=""
@@ -164,6 +168,15 @@ compute_initial_features() {
 
 write_initial_features_file() {
     local wc="$1" mm="$2" dock="$3" expose="$4"
+    # install.sh is safe/expected to re-run — a fresh install, a re-run
+    # after a partial failure, or `ocd update` re-invoking it from a newer
+    # release. An existing features.json means this isn't a first install,
+    # so leave the user's feature toggles alone unless they explicitly
+    # asked to reset them via --features.
+    if [[ -f "$OCD_FEATURES_FILE" && -z "$FEATURES_ARG" ]]; then
+        ocd_info "Existing features.json found — leaving your feature toggles as-is (pass --features=... to reset them)."
+        return 0
+    fi
     ocd_info "Writing initial features.json (window-controls=$wc mouse-management=$mm dock=$dock expose=$expose)"
     if ocd_dry_run; then
         printf '[dry-run] would write %s\n' "$OCD_FEATURES_FILE" >&2
@@ -237,6 +250,7 @@ main() {
     { read -r wc; read -r mm; read -r dock; read -r expose; } < <(compute_initial_features)
 
     install_files
+    ocd_record_installed_ref "$REPO_DIR"
     write_initial_features_file "$wc" "$mm" "$dock" "$expose"
 
     ocd_info "Reconciling system state via 'ocd apply'..."

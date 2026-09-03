@@ -33,6 +33,8 @@ source "$LIB_DIR/preflight.sh"
 source "$LIB_DIR/shellplugins.sh"
 # shellcheck source=lib/hyprbars.sh
 source "$LIB_DIR/hyprbars.sh"
+# shellcheck source=lib/update.sh
+source "$LIB_DIR/update.sh"
 
 ocd_usage() {
     cat <<'EOF'
@@ -45,6 +47,7 @@ Commands:
   disable <feature>        Turn a feature off in features.json (does not apply)
   control-style [style]    Print the current titlebar button style, or set it
                             (solid|text) in features.json (does not apply)
+  update                   Check for and install the latest published release
   help                     Show this message
 
 Features: window-controls, mouse-management, dock, expose
@@ -56,12 +59,24 @@ Flags (apply):
   --notify              Send a desktop notification when apply finishes
                          (used by the settings panel; optional for CLI use)
 
+Flags (update):
+  --dry-run             Show what would be fetched/installed, change nothing
+  --yes                 Don't prompt for confirmation before updating
+
 features.json is safe to edit by hand — follow with `ocd apply`.
 EOF
 }
 
 cmd_status() {
     ocd_features_init
+    local installed_tag installed_sha
+    installed_tag="$(ocd_installed_tag)"
+    installed_sha="$(ocd_installed_sha)"
+    if [[ -n "$installed_sha" ]]; then
+        echo "installed:         ${installed_tag:-<untagged>} ($installed_sha)"
+    else
+        echo "installed:         unknown (no ${OCD_INSTALLED_REF_FILE#"$HOME"/} recorded)"
+    fi
     echo "ocd feature state (from $OCD_FEATURES_FILE):"
     ocd_features_print_status
     printf '  %-18s %s\n' "control-style" "$(ocd_control_style_get)"
@@ -178,6 +193,69 @@ cmd_apply() {
     fi
 }
 
+cmd_update() {
+    local dry=0 yes=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run) dry=1; DRY_RUN=1 ;;
+            --yes) yes=1 ;;
+            *) ocd_die "unknown flag to 'ocd update': $1" ;;
+        esac
+        shift
+    done
+
+    command -v git >/dev/null 2>&1 || ocd_die "git is required to update (sudo pacman -S --needed git)"
+
+    ocd_info "Checking $OCD_REPO_URL for the latest published release..."
+    local latest_tag latest_sha installed_sha
+    latest_tag="$(ocd_latest_release_tag)"
+    [[ -n "$latest_tag" ]] || ocd_die "no published release tag found on $OCD_REPO_URL"
+    latest_sha="$(ocd_tag_sha "$latest_tag")"
+    [[ -n "$latest_sha" ]] || ocd_die "could not resolve $latest_tag to a commit"
+    installed_sha="$(ocd_installed_sha)"
+
+    if [[ -n "$installed_sha" && "$installed_sha" == "$latest_sha" ]]; then
+        ocd_info "Already up to date: $latest_tag ($latest_sha)"
+        return 0
+    fi
+
+    if [[ -n "$installed_sha" ]]; then
+        ocd_info "Update available: $latest_tag ($latest_sha) — currently installed: $installed_sha"
+    else
+        ocd_info "Update available: $latest_tag ($latest_sha) — no installed version on record"
+    fi
+
+    if [[ "$yes" != "1" && "$dry" != "1" ]]; then
+        local reply
+        read -r -p "Update ocd to $latest_tag now? [y/N] " reply || reply="n"
+        [[ "$reply" =~ ^[Yy]$ ]] || { ocd_info "Update cancelled."; return 0; }
+    fi
+
+    local clone_dir=""
+    # cmd_update returns normally on success, but a trap set here stays
+    # armed process-wide after that — it must not dereference this
+    # function's local clone_dir once cmd_update itself has returned, so
+    # it's cleared explicitly below rather than left to fire at process
+    # exit (that's the ${clone_dir:-} guard: defense in depth, not the fix).
+    cleanup_update() { [[ -n "${clone_dir:-}" && -d "$clone_dir" ]] && rm -rf "$clone_dir"; }
+    trap cleanup_update EXIT
+
+    clone_dir="$(mktemp -d "${TMPDIR:-/tmp}/ocd-update.XXXXXX")"
+    ocd_info "Fetching $latest_tag ($latest_sha)..."
+    ocd_fetch_pinned "$latest_sha" "$clone_dir"
+
+    [[ -f "$clone_dir/install.sh" ]] || ocd_die "install.sh missing from $latest_tag"
+    chmod +x "$clone_dir/install.sh"
+
+    ocd_info "Re-running the installer from $latest_tag — existing feature toggles are preserved..."
+    local install_args=()
+    [[ "$dry" == "1" ]] && install_args+=(--dry-run)
+    "$clone_dir/install.sh" "${install_args[@]}"
+
+    rm -rf "$clone_dir"
+    trap - EXIT
+}
+
 main() {
     ocd_log_init
     local cmd="${1:-help}"
@@ -188,6 +266,7 @@ main() {
         enable) cmd_enable "$@" ;;
         disable) cmd_disable "$@" ;;
         control-style) cmd_control_style "$@" ;;
+        update) cmd_update "$@" ;;
         help|-h|--help) ocd_usage ;;
         *) ocd_error "unknown command: $cmd"; ocd_usage; exit 1 ;;
     esac

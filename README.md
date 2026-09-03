@@ -80,6 +80,26 @@ panel (bar icon, or SUPER+,) or with `ocd enable/disable <feature>` +
 Requires a live Omarchy 4.x session — the installer checks this itself and
 refuses to run on anything else.
 
+`boot.sh` never follows the `main` branch — it's pinned to the exact commit
+tagged for the current release (`v1.0` right now), fetched by that commit's
+SHA and verified before anything runs. `main` can move ahead with
+in-progress work without changing what `curl | bash` installs; only cutting
+a new release tag does that.
+
+## Updating
+
+```sh
+ocd update
+```
+
+Checks the repository for the latest published release tag, and if it's
+newer than what's installed, fetches and re-runs the installer from that
+exact pinned commit — same trust model as the initial install, never `main`.
+Your feature toggles in `features.json` are left exactly as they are; only
+`--features=list` on a fresh install sets them. Flags: `--dry-run`, `--yes`
+(skip the confirmation prompt). `ocd status` shows the currently installed
+tag/commit.
+
 ## Uninstallation
 
 ```sh
