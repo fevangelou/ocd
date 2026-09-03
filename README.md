@@ -41,31 +41,6 @@ Here's a short video demo as well:
 
 https://github.com/user-attachments/assets/a3131b9f-ffcc-44e9-bb4f-3404a54251d9
 
-## Changelog
-
-- **v1.0** — Initial upload. Window controls, mouse management, dock,
-  Exposé, and the settings panel, targeting Omarchy 4.x ("Quattro").
-  
-## To Do
-For the Dock:
-- Resolve auto-hiding not working when all windows are closed
-- Add 2 icons to reveal the Omarchy menu and the desktop
-- Use a colored dot instead of (min) for minimized apps
-- Explore a second more compact dock design option (e.g. with icons) as in Ubuntu Desktop, Gnome, macOS etc. The minimal Omarchy-like option will remain default.
-- Explore if it's possible to enable drag and drop for app tabs
-
-For the Popup:
-- Switch to the font used in other navbar popups (so things look more "native")
-
-For the Exposé:
-- Provide text assistance like 'Close with "Esc" key or hover your mouse on the top/right corner'
-- Add option to choose the corner that triggers Exposé on your desktop
-
-For the Window Controls:
-- Consider +, - & inside each respective control (or as an option to toggle in the settings popup)
-- Tooltip when hovering on each control
-- Consider "double-click on window title" action to maximize/restore window size
-
 ## Installation
 
 Recommended — preview first, no changes made:
@@ -121,6 +96,31 @@ prompt before deleting your `features.json`/pins/overrides), and
 `--restore-backup TIMESTAMP` (roll your Hyprland config back to the exact
 state a backup captured before install — see
 `~/.local/state/ocd/backups/`).
+
+## Changelog
+
+- **v1.0** — Initial upload. Window controls, mouse management, dock,
+  Exposé, and the settings panel, targeting Omarchy 4.x ("Quattro").
+  
+## To Do
+For the Dock:
+- Resolve auto-hiding not working when all windows are closed
+- Add 2 icons to reveal the Omarchy menu and the desktop
+- Use a colored dot instead of (min) for minimized apps
+- Explore a second more compact dock design option (e.g. with icons) as in Ubuntu Desktop, Gnome, macOS etc. The minimal Omarchy-like option will remain default.
+- Explore if it's possible to enable drag and drop for app tabs
+
+For the Popup:
+- Switch to the font used in other navbar popups (so things look more "native")
+
+For the Exposé:
+- Provide text assistance like 'Close with "Esc" key or hover your mouse on the top/right corner'
+- Add option to choose the corner that triggers Exposé on your desktop
+
+For the Window Controls:
+- Consider +, - & inside each respective control (or as an option to toggle in the settings popup)
+- Tooltip when hovering on each control
+- Consider "double-click on window title" action to maximize/restore window size
 
 ## How it's built
 
