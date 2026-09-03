@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# ocd — user-facing CLI. `features.json` is the single source of truth for
+# what's *wanted*; this command reconciles actual system state to it.
+set -euo pipefail
+
+OCD_SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+LIB_DIR="$(cd "$(dirname "$OCD_SELF")/../lib" && pwd)"
+
+# shellcheck source=lib/common.sh
+source "$LIB_DIR/common.sh"
+# shellcheck source=lib/log.sh
+source "$LIB_DIR/log.sh"
+# shellcheck source=lib/jsonpatch.sh
+source "$LIB_DIR/jsonpatch.sh"
+# shellcheck source=lib/markers.sh
+source "$LIB_DIR/markers.sh"
+# shellcheck source=lib/minimize.sh
+source "$LIB_DIR/minimize.sh"
+# shellcheck source=lib/features.sh
+source "$LIB_DIR/features.sh"
+# shellcheck source=lib/preflight.sh
+source "$LIB_DIR/preflight.sh"
+# shellcheck source=lib/shellplugins.sh
+source "$LIB_DIR/shellplugins.sh"
+# shellcheck source=lib/hyprbars.sh
+source "$LIB_DIR/hyprbars.sh"
+
+ocd_usage() {
+    cat <<'EOF'
+Usage: ocd <command> [args]
+
+Commands:
+  apply                    Reconcile system state to ~/.config/omarchy/ocd/features.json
+  status                   Print the reconciled state of every feature
+  enable <feature>         Turn a feature on in features.json (does not apply)
+  disable <feature>        Turn a feature off in features.json (does not apply)
+  control-style [style]    Print the current titlebar button style, or set it
+                            (solid|text) in features.json (does not apply)
+  help                     Show this message
+
+Features: window-controls, mouse-management, dock, expose
+Control styles (window-controls sub-option): solid, text (shows D/H/H —
+Dock/Hoist/Halt — as minimize/maximize/close instead of icons)
+
+Flags (apply):
+  --dry-run             Print every mutation, change nothing
+  --notify              Send a desktop notification when apply finishes
+                         (used by the settings panel; optional for CLI use)
+
+features.json is safe to edit by hand — follow with `ocd apply`.
+EOF
+}
+
+cmd_status() {
+    ocd_features_init
+    echo "ocd feature state (from $OCD_FEATURES_FILE):"
+    ocd_features_print_status
+    printf '  %-18s %s\n' "control-style" "$(ocd_control_style_get)"
+    echo
+    if command -v hyprctl >/dev/null 2>&1 && hyprctl version >/dev/null 2>&1; then
+        if ocd_hyprbars_is_enabled; then
+            echo "hyprbars:          loaded"
+        else
+            echo "hyprbars:          not loaded"
+        fi
+    else
+        echo "hyprbars:          unknown (no live Hyprland session)"
+    fi
+    if command -v omarchy-shell >/dev/null 2>&1 && omarchy-shell shell ping >/dev/null 2>&1; then
+        echo "shell plugin state (raw, from 'omarchy-shell shell listPlugins'):"
+        omarchy-shell shell listPlugins 2>/dev/null | grep -F "$OCD_PLUGIN_ID" || echo "  (no ocd plugin ids found — not installed or not scanned yet)"
+    fi
+}
+
+cmd_enable() {
+    local feature="${1:?usage: ocd enable <feature>}"
+    ocd_feature_set "$feature" true
+    ocd_info "Set $feature = true in features.json. Run 'ocd apply' to reconcile the system."
+}
+
+cmd_disable() {
+    local feature="${1:?usage: ocd disable <feature>}"
+    ocd_feature_set "$feature" false
+    ocd_info "Set $feature = false in features.json. Run 'ocd apply' to reconcile the system."
+}
+
+cmd_control_style() {
+    local style="${1:-}"
+    if [[ -z "$style" ]]; then
+        ocd_control_style_get
+        echo
+        return 0
+    fi
+    ocd_control_style_set "$style"
+    ocd_info "Set windowControlsStyle = $style in features.json. Run 'ocd apply' to reconcile the system."
+}
+
+cmd_apply() {
+    local notify=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run) DRY_RUN=1; shift ;;
+            --notify) notify=1; shift ;;
+            *) ocd_die "unknown flag to 'ocd apply': $1" ;;
+        esac
+    done
+
+    ocd_features_init
+
+    local dock expose window_controls mouse_management
+    dock="$(ocd_feature_get dock)"
+    expose="$(ocd_feature_get expose)"
+    window_controls="$(ocd_feature_get window-controls)"
+    mouse_management="$(ocd_feature_get mouse-management)"
+
+    if [[ "$window_controls" == "true" && "$dock" == "false" && "$expose" == "false" ]]; then
+        ocd_die "features.json requests window-controls with no restore surface (dock and expose are both false). Fix features.json or run: ocd enable dock (or expose)"
+    fi
+
+    # If a restore surface is about to end up disabled, sweep first no
+    # matter how the file got that way (hand-edit included).
+    [[ "$dock" == "false" || "$expose" == "false" ]] && ocd_sweep_minimized
+
+    ocd_info "Reconciling shell.json plugin entries..."
+    ocd_shell_set_enabled "$OCD_ID_DOCK" "$dock"
+    ocd_shell_set_enabled "$OCD_ID_EXPOSE" "$expose"
+    # Settings isn't gated by a feature flag — it's the control surface
+    # itself, always wanted. A freshly-dropped-in manual plugin lands
+    # disabled by default until something explicitly enables it, so this
+    # must run unconditionally rather than only on install.
+    ocd_shell_set_enabled "$OCD_ID_SETTINGS" true
+
+    if [[ "$window_controls" == "true" ]]; then
+        if ! ocd_hyprbars_enable; then
+            # Keep features.json truthful: it must never claim
+            # window-controls is on when hyprbars isn't actually loaded.
+            ocd_feature_set window-controls false
+            window_controls=false
+        fi
+    else
+        ocd_hyprbars_disable || true
+    fi
+
+    if command -v hyprctl >/dev/null 2>&1 && hyprctl version >/dev/null 2>&1; then
+        ocd_info "Validating Hyprland config..."
+        if command -v Hyprland >/dev/null 2>&1; then
+            ocd_run "verify config" -- Hyprland --verify-config || ocd_die "Hyprland config failed --verify-config; not reloading. Check $HYPR_OCD_LUA and your other hypr/*.lua files."
+        fi
+        ocd_run "reload Hyprland config" -- hyprctl reload
+        # A full `hyprctl reload` unloads hyprpm-managed plugins, hyprbars
+        # included — confirmed live: `hyprctl plugin list` goes empty right
+        # after, even though hyprpm's own state still says enabled. hyprpm
+        # itself re-attaches via its own `reload`, which doesn't re-parse
+        # config (so it's cheap/safe to call every time, not just here).
+        if [[ "$window_controls" == "true" ]] && command -v hyprpm >/dev/null 2>&1; then
+            ocd_run "re-attach hyprpm plugins after config reload" -- hyprpm reload -n
+        fi
+    fi
+
+    if command -v omarchy-shell >/dev/null 2>&1; then
+        ocd_run "rescan plugins" -- omarchy-shell shell rescanPlugins || true
+        ocd_run "reload shell config" -- omarchy-shell shell reloadConfig || true
+    fi
+
+    ocd_info "Apply complete. mouse-management=$mouse_management window-controls=$window_controls dock=$dock expose=$expose"
+
+    if [[ "$notify" == "1" ]] && command -v notify-send >/dev/null 2>&1 && ! ocd_dry_run; then
+        notify-send -a ocd "ocd" "Settings applied: window-controls=$window_controls, mouse-management=$mouse_management, dock=$dock, expose=$expose"
+    fi
+}
+
+main() {
+    ocd_log_init
+    local cmd="${1:-help}"
+    [[ $# -gt 0 ]] && shift
+    case "$cmd" in
+        apply) cmd_apply "$@" ;;
+        status) cmd_status "$@" ;;
+        enable) cmd_enable "$@" ;;
+        disable) cmd_disable "$@" ;;
+        control-style) cmd_control_style "$@" ;;
+        help|-h|--help) ocd_usage ;;
+        *) ocd_error "unknown command: $cmd"; ocd_usage; exit 1 ;;
+    esac
+}
+
+main "$@"

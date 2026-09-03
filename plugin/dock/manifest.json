@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.fevangelou.ocd.dock",
+  "name": "ocd Dock",
+  "version": "0.1.0",
+  "author": "fevangelou",
+  "license": "MIT",
+  "description": "Classic-desktop dock: running windows plus pinned apps, auto-hiding at the bottom edge.",
+  "kinds": ["service"],
+  "entryPoints": {
+    "service": "Dock.qml"
+  }
+}
