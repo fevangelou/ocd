@@ -18,7 +18,6 @@ OCD_INSTALL_DIR="${OCD_INSTALL_DIR:-$HOME/.local/share/ocd}"
 
 OCD_STATE_DIR="${OCD_STATE_DIR:-$HOME/.local/state/ocd}"
 OCD_LOG_FILE="$OCD_STATE_DIR/install.log"
-OCD_BACKUP_ROOT="$OCD_STATE_DIR/backups"
 
 OCD_CONFIG_DIR="${OCD_CONFIG_DIR:-$HOME/.config/omarchy/ocd}"
 OCD_FEATURES_FILE="$OCD_CONFIG_DIR/features.json"

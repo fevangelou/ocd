@@ -38,8 +38,6 @@ source "$LIB_DIR/minimize.sh"
 source "$LIB_DIR/features.sh"
 # shellcheck source=lib/preflight.sh
 source "$LIB_DIR/preflight.sh"
-# shellcheck source=lib/backup.sh
-source "$LIB_DIR/backup.sh"
 # shellcheck source=lib/shellplugins.sh
 source "$LIB_DIR/shellplugins.sh"
 # shellcheck source=lib/hyprbars.sh
@@ -240,11 +238,6 @@ main() {
     ocd_dry_run && ocd_info "--dry-run: no changes will be made"
 
     run_preflight
-
-    local stamp
-    stamp="$(ocd_backup_create)"
-    ocd_info "Backup created: $stamp"
-    ocd_info "Restore command: $(ocd_backup_restore_cmd_hint "$stamp")"
 
     local wc mm dock expose
     { read -r wc; read -r mm; read -r dock; read -r expose; } < <(compute_initial_features)

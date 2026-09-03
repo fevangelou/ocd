@@ -112,10 +112,7 @@ Fully reverts every change ocd made — strips the Hyprland config hook,
 disables hyprbars if ocd was the one that enabled it, removes all three
 Quickshell plugins, and cleans up `~/.local/share/ocd`. Safe to run even
 after a partially-failed install. Flags: `--dry-run`, `--yes` (skip the
-prompt before deleting your `features.json`/pins/overrides), and
-`--restore-backup TIMESTAMP` (roll your Hyprland config back to the exact
-state a backup captured before install — see
-`~/.local/state/ocd/backups/`).
+prompt before deleting your `features.json`/pins/overrides).
 
 ## Changelog
 

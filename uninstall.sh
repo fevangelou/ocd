@@ -26,27 +26,20 @@ source "$LIB_DIR/jsonpatch.sh"
 source "$LIB_DIR/markers.sh"
 # shellcheck source=lib/minimize.sh
 source "$LIB_DIR/minimize.sh"
-# shellcheck source=lib/backup.sh
-source "$LIB_DIR/backup.sh"
 # shellcheck source=lib/shellplugins.sh
 source "$LIB_DIR/shellplugins.sh"
 # shellcheck source=lib/hyprbars.sh
 source "$LIB_DIR/hyprbars.sh"
 
 ASSUME_YES=0
-RESTORE_STAMP=""
 
 ocd_uninstall_usage() {
     cat <<'EOF'
-Usage: uninstall.sh [--dry-run] [--yes] [--restore-backup TIMESTAMP] [--help]
+Usage: uninstall.sh [--dry-run] [--yes] [--help]
 
   --dry-run                  Print every mutation, change nothing.
   --yes                      Don't prompt before deleting features.json and
                               the app-ID override map (your data).
-  --restore-backup TIMESTAMP Also restore ~/.config/hypr/*.lua and shell.json
-                              from the named backup (see `ocd status` output
-                              or ~/.local/state/ocd/backups/) instead of just
-                              stripping ocd's own marker block.
   --help                     Show this message.
 EOF
 }
@@ -56,7 +49,6 @@ parse_args() {
         case "$1" in
             --dry-run) DRY_RUN=1; shift ;;
             --yes) ASSUME_YES=1; shift ;;
-            --restore-backup) RESTORE_STAMP="${2:?--restore-backup needs a timestamp}"; shift 2 ;;
             --help|-h) ocd_uninstall_usage; exit 0 ;;
             *) ocd_die "unknown flag: $1 (see --help)" ;;
         esac
@@ -97,10 +89,6 @@ main() {
         ocd_run "remove ocd.lua" -- rm -f "$HYPR_OCD_LUA"
     fi
 
-    if [[ -n "$RESTORE_STAMP" ]]; then
-        ocd_backup_restore "$RESTORE_STAMP"
-    fi
-
     if [[ -f "$OCD_HYPRBARS_OWNED_MARKER" ]]; then
         ocd_hyprbars_disable
         ocd_run "clear hyprbars-owned marker" -- rm -f "$OCD_HYPRBARS_OWNED_MARKER"
@@ -133,7 +121,6 @@ main() {
     fi
 
     ocd_info "Uninstall complete."
-    ocd_info "Backups (if any) remain at $OCD_BACKUP_ROOT — use --restore-backup TIMESTAMP to apply one, or delete that directory yourself when you no longer need it."
 }
 
 main "$@"
