@@ -18,6 +18,8 @@ Omarchy, so it *feels* familiar from day one. No keybindings to memorize, no
 mental gymnastics — just click what you'd normally click, and grow into
 Omarchy's keyboard-driven workflows at your own pace, if at all.
 
+Embrace Minimize, Maximize or Close in Omarchy - or as I'd like to call it: Dock, Hoist, Halt ;)
+
 **Features:**
 
 - **Window controls** — real titlebars with minimize / maximize / close
