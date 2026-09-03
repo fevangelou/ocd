@@ -21,9 +21,13 @@
 set -euo pipefail
 
 OCD_REPO_URL="${OCD_REPO_URL:-https://github.com/fevangelou/ocd.git}"
-# No tagged release exists yet; this should become a pinned stable tag once
-# ocd starts cutting releases. Override for testing with `OCD_REF=some-branch`.
-OCD_REF="${OCD_REF:-main}"
+# Pinned to the exact commit tagged v1.0 so `curl | bash` always runs the
+# code that was actually reviewed for the plugin marketplace listing, not
+# whatever `main` has since moved to. Override for testing with
+# `OCD_REF=<branch|tag|sha>` — the post-checkout pin verification below is
+# skipped for a non-SHA override since there's nothing fixed to check it
+# against.
+OCD_REF="${OCD_REF:-332b98067426f6c232dfb41334e0ad1f0592d89a}"
 
 ocd_boot_log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 ocd_boot_die() { printf '\033[1;31m==> error:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -45,8 +49,21 @@ main() {
 
     clone_dir="$(mktemp -d "${TMPDIR:-/tmp}/ocd-install.XXXXXX")"
 
-    ocd_boot_log "Cloning ocd ($OCD_REF) into $clone_dir..."
-    git clone --quiet --depth 1 --branch "$OCD_REF" "$OCD_REPO_URL" "$clone_dir"
+    # A plain `git clone --branch` only accepts branch/tag names, not an
+    # arbitrary commit SHA — so pinning to a SHA needs an explicit
+    # fetch-by-SHA + detached checkout instead. GitHub allows fetching any
+    # SHA reachable from a ref (which a tagged release commit always is).
+    ocd_boot_log "Fetching ocd ($OCD_REF) into $clone_dir..."
+    git init --quiet "$clone_dir"
+    git -C "$clone_dir" remote add origin "$OCD_REPO_URL"
+    git -C "$clone_dir" fetch --quiet --depth 1 origin "$OCD_REF"
+    git -C "$clone_dir" checkout --quiet FETCH_HEAD
+
+    if [[ "$OCD_REF" =~ ^[0-9a-f]{40}$ ]]; then
+        resolved="$(git -C "$clone_dir" rev-parse HEAD)"
+        [[ "$resolved" == "$OCD_REF" ]] ||
+            ocd_boot_die "checked-out commit ($resolved) does not match pinned ref ($OCD_REF) — refusing to run untrusted code"
+    fi
 
     [[ -f "$clone_dir/install.sh" ]] || ocd_boot_die "install.sh missing from cloned repo"
     chmod +x "$clone_dir/install.sh"
