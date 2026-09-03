@@ -8,7 +8,7 @@ Hyprland + Quickshell stack.**
 
 ## What is OCD?
 
-Omarchy is a great on-ramp from Windows, macOS, Ubuntu, or Fedora into the
+Omarchy is a great on-ramp from Windows, macOS and "traditional" Linux desktops like Gnome or KDE into the
 Arch/Hyprland world — except that its keyboard-driven, tiling-first design
 asks a lot of anyone whose muscle memory is a taskbar, a dock, and a mouse.
 OCD exists to close that gap: it layers the classic desktop conventions most
