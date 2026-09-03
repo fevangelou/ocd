@@ -35,6 +35,10 @@ settings panel or the `ocd` CLI. Nothing here is vendored from another
 plugin, and installing refuses to proceed (without `--force`) if it detects
 a conflicting community dock/Exposé plugin already set up.
 
+Here's a short video demo as well:
+
+https://github.com/user-attachments/assets/a3131b9f-ffcc-44e9-bb4f-3404a54251d9
+
 ## Changelog
 
 - **v1.0** — Initial upload. Window controls, mouse management, dock,
