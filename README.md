@@ -120,6 +120,12 @@ prompt before deleting your `features.json`/pins/overrides).
 
 ## Changelog
 
+- **v1.1** — Added `ocd update` (plus `--main` for pulling an unreleased
+  dev build) to update in place from the latest published release without
+  a reinstall. `boot.sh` now pins to that release's exact commit instead
+  of following `main`. Removed the config backup/restore mechanism —
+  ocd's Hyprland/shell.json changes are narrow and self-reversible, so a
+  separate snapshot step was unneeded complexity.
 - **v1.0** — Initial upload. Window controls, mouse management, dock,
   Exposé, and the settings panel, targeting Omarchy 4.x ("Quattro").
   

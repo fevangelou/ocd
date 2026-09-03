@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.0
+#  * @version   1.1
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
