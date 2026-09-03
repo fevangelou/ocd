@@ -107,16 +107,23 @@ commit.
 ## Uninstallation
 
 ```sh
+ocd uninstall
+```
+
+`ocd remove` and `ocd purge` are aliases for the same command. Fully
+reverts every change ocd made — strips the Hyprland config hook, disables
+hyprbars if ocd was the one that enabled it, removes all three Quickshell
+plugins, and cleans up `~/.local/share/ocd`. Safe to run even after a
+partially-failed install. Flags: `--dry-run`, `--yes` (skip the prompt
+before deleting your `features.json`/pins/overrides).
+
+If `ocd` itself isn't on your PATH, run the underlying script directly:
+
+```sh
 ~/.local/share/ocd/uninstall.sh
 # or, from a checkout:
 ./uninstall.sh
 ```
-
-Fully reverts every change ocd made — strips the Hyprland config hook,
-disables hyprbars if ocd was the one that enabled it, removes all three
-Quickshell plugins, and cleans up `~/.local/share/ocd`. Safe to run even
-after a partially-failed install. Flags: `--dry-run`, `--yes` (skip the
-prompt before deleting your `features.json`/pins/overrides).
 
 ## Changelog
 

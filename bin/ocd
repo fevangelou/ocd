@@ -14,6 +14,11 @@ set -euo pipefail
 
 OCD_SELF="$(readlink -f "${BASH_SOURCE[0]}")"
 LIB_DIR="$(cd "$(dirname "$OCD_SELF")/../lib" && pwd)"
+# Parent of lib/ — the installed copy's root ($OCD_INSTALL_DIR) when run as
+# ~/.local/bin/ocd, or a repo checkout's root when run as ./bin/ocd before
+# ever installing. uninstall.sh is always this script's sibling one level
+# up, in both cases.
+OCD_SELF_ROOT="$(dirname "$LIB_DIR")"
 
 # shellcheck source=lib/common.sh
 source "$LIB_DIR/common.sh"
@@ -48,6 +53,7 @@ Commands:
   control-style [style]    Print the current titlebar button style, or set it
                             (solid|text) in features.json (does not apply)
   update                   Check for and install the latest published release
+  uninstall                Fully revert ocd (aliases: remove, purge)
   help                     Show this message
 
 Features: window-controls, mouse-management, dock, expose
@@ -64,6 +70,11 @@ Flags (update):
   --yes                 Don't prompt for confirmation before updating
   --main                Fetch the current tip of 'main' instead of the
                          latest published release (development use only)
+
+Flags (uninstall):
+  --dry-run             Print every mutation, change nothing
+  --yes                 Don't prompt before deleting features.json and
+                         the app-ID override map (your data)
 
 features.json is safe to edit by hand — follow with `ocd apply`.
 EOF
@@ -267,6 +278,12 @@ cmd_update() {
     trap - EXIT
 }
 
+cmd_uninstall() {
+    local uninstall_script="$OCD_SELF_ROOT/uninstall.sh"
+    [[ -x "$uninstall_script" ]] || ocd_die "uninstall.sh not found at $uninstall_script"
+    "$uninstall_script" "$@"
+}
+
 main() {
     ocd_log_init
     local cmd="${1:-help}"
@@ -278,6 +295,7 @@ main() {
         disable) cmd_disable "$@" ;;
         control-style) cmd_control_style "$@" ;;
         update) cmd_update "$@" ;;
+        uninstall|remove|purge) cmd_uninstall "$@" ;;
         help|-h|--help) ocd_usage ;;
         *) ocd_error "unknown command: $cmd"; ocd_usage; exit 1 ;;
     esac
