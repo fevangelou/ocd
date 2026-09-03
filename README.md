@@ -4,6 +4,8 @@
 that brings back familiar, conventional desktop-UI affordances on top of its
 Hyprland + Quickshell stack.**
 
+<img width="1920" height="1080" alt="screenshot-2026-09-03_04-21-44" src="https://github.com/user-attachments/assets/10a4450e-687c-4415-a8a3-b6f6335e382d" />
+
 ## What is OCD?
 
 Omarchy is a great on-ramp from Windows, macOS, Ubuntu, or Fedora into the
@@ -114,6 +116,8 @@ state a backup captured before install — see
 Nothing here is hidden behind a build step — every file is plain,
 inspectable source, and `features.json`/`appid-overrides.json`/
 `dock-pins.json` are hand-editable JSON.
+
+Did we mention it was live-built on Omarchy?
 
 ## License
 
