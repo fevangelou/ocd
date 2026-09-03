@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# /**
+#  * @version   1.0
+#  * @package   Omarchy Classic Desktop (OCD)
+#  * @author    Fotis Evangelou
+#  * @url       https://github.com/fevangelou/ocd
+#  * @copyright Copyright (c) 2026 Fotis Evangelou. All rights reserved.
+#  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
+#  */
+
 # Backup/restore of files ocd is about to mutate: Hyprland Lua config and
 # shell.json. Never touches files ocd owns outright (those are just deleted
 # on uninstall, no backup needed).

@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# /**
+#  * @version   1.0
+#  * @package   Omarchy Classic Desktop (OCD)
+#  * @author    Fotis Evangelou
+#  * @url       https://github.com/fevangelou/ocd
+#  * @copyright Copyright (c) 2026 Fotis Evangelou. All rights reserved.
+#  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
+#  */
+
 # ocd installer. Run from a checked-out copy of the repo (boot.sh clones one
 # and execs this). Safe to re-run: every step is idempotent.
 set -euo pipefail

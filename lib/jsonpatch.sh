@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# /**
+#  * @version   1.0
+#  * @package   Omarchy Classic Desktop (OCD)
+#  * @author    Fotis Evangelou
+#  * @url       https://github.com/fevangelou/ocd
+#  * @copyright Copyright (c) 2026 Fotis Evangelou. All rights reserved.
+#  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
+#  */
+
 # Safe jq read/patch/write: read -> transform -> validate -> atomic move.
 # Used for both shell.json (a file ocd does not own) and ocd's own
 # features.json / appid-overrides.json.

@@ -1,3 +1,12 @@
+// /**
+//  * @version   1.0
+//  * @package   Omarchy Classic Desktop (OCD)
+//  * @author    Fotis Evangelou
+//  * @url       https://github.com/fevangelou/ocd
+//  * @copyright Copyright (c) 2026 Fotis Evangelou. All rights reserved.
+//  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
+//  */
+
 // A single taskbar tab: a pinned app (not running, launches on click) or
 // a window (running or minimized, focuses/restores on click). Text only —
 // no icons, by request. Sized entirely by the parent Row (tabsRow.tabWidth

@@ -1,3 +1,12 @@
+-- /**
+--  * @version   1.0
+--  * @package   Omarchy Classic Desktop (OCD)
+--  * @author    Fotis Evangelou
+--  * @url       https://github.com/fevangelou/ocd
+--  * @copyright Copyright (c) 2026 Fotis Evangelou. All rights reserved.
+--  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
+--  */
+
 -- ocd (Omarch Classic Desktop) — Hyprland-side configuration.
 --
 -- Installed to ~/.config/hypr/ocd.lua and loaded via a single

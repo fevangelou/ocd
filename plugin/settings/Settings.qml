@@ -1,3 +1,12 @@
+// /**
+//  * @version   1.0
+//  * @package   Omarchy Classic Desktop (OCD)
+//  * @author    Fotis Evangelou
+//  * @url       https://github.com/fevangelou/ocd
+//  * @copyright Copyright (c) 2026 Fotis Evangelou. All rights reserved.
+//  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
+//  */
+
 // ocd Settings — a `panel`-kind plugin (same "owns its own PanelWindow"
 // pattern as the first-party OSD panel: shell/plugins/osd/Osd.qml). Writes
 // ONLY features.json; it performs no other system mutation itself. Every

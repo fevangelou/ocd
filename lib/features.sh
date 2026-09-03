@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# /**
+#  * @version   1.0
+#  * @package   Omarchy Classic Desktop (OCD)
+#  * @author    Fotis Evangelou
+#  * @url       https://github.com/fevangelou/ocd
+#  * @copyright Copyright (c) 2026 Fotis Evangelou. All rights reserved.
+#  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
+#  */
+
 # features.json: the single source of truth for which ocd features are
 # wanted. Written by the settings panel or by hand; `ocd apply` reconciles
 # actual system state to it. This file only reads/writes it and enforces the
