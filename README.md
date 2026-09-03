@@ -145,10 +145,14 @@ inspectable source, and `features.json`/`appid-overrides.json`/
 
 Did we mention it was live-built on Omarchy?
 
+## Code Documentation
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/fevangelou/ocd)
+
 ## Acknowledgements
 
 Thank you to [DHH](https://github.com/dhh) and the whole Omarchy community —
-without Omarchy itself, and the welcoming, keyboard-driven desktop it
+without Omarchy itself and the welcoming, keyboard-driven desktop it
 introduced to so many newcomers, this mod wouldn't have a home to exist in.
 
 No code from any other plugin is vendored here, but two projects were read
