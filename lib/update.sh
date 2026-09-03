@@ -16,6 +16,18 @@
 OCD_REPO_URL="${OCD_REPO_URL:-https://github.com/fevangelou/ocd.git}"
 OCD_INSTALLED_REF_FILE="$OCD_INSTALL_DIR/.installed-ref"
 
+# ocd_tag_for_sha <sha>: prints the release tag whose commit is exactly
+# <sha>, or nothing. Looked up against the remote directly rather than via
+# local tag refs — boot.sh/ocd_fetch_pinned's shallow fetch-by-SHA never
+# fetches tags, so a checkout that IS exactly a tagged release still has no
+# local tag ref for `git describe` to find.
+ocd_tag_for_sha() {
+    local sha="$1"
+    git ls-remote --tags "$OCD_REPO_URL" 2>/dev/null | awk -v sha="$sha" '
+        $1 == sha { ref = $2; sub(/\^\{\}$/, "", ref); sub(/^refs\/tags\//, "", ref); print ref }
+    ' | tail -1
+}
+
 # ocd_record_installed_ref <repo_dir>: called by install.sh right after a
 # successful install, so `ocd update`/`ocd status` know exactly which
 # commit (and tag, if any) is actually on disk. Reads git metadata from the
@@ -26,7 +38,7 @@ ocd_record_installed_ref() {
     command -v git >/dev/null 2>&1 || return 0
     sha="$(git -C "$repo_dir" rev-parse HEAD 2>/dev/null || true)"
     [[ -n "$sha" ]] || return 0
-    tag="$(git -C "$repo_dir" describe --tags --exact-match 2>/dev/null || true)"
+    tag="$(ocd_tag_for_sha "$sha")"
     if ocd_dry_run; then
         printf '[dry-run] would record installed ref (sha=%s tag=%s) at %s\n' "$sha" "${tag:-none}" "$OCD_INSTALLED_REF_FILE" >&2
         return 0
