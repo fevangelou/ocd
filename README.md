@@ -161,6 +161,9 @@ For the Window Controls:
 - Tooltip when hovering on each control
 - Consider "double-click on window title" action to maximize/restore window size
 
+Global:
+- Update along with `omarchy update`, either by default or as an option to enable in the settings popup.
+
 ## How it's built
 
 - **Bash** — `bin/ocd` (the CLI) and `lib/*.sh` own every system mutation:
