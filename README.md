@@ -1,6 +1,6 @@
 # ocd — Omarchy Classic Desktop
 
-**A curl-installable mod for [Omarchy](https://omarchy.org) 4.x ("Quattro")
+**A curl-installable plugin/mod for [Omarchy](https://omarchy.org) 4.x ("Quattro")
 that brings back familiar, conventional desktop-UI affordances on top of its
 Hyprland + Quickshell stack.**
 
@@ -45,6 +45,20 @@ https://github.com/user-attachments/assets/a3131b9f-ffcc-44e9-bb4f-3404a54251d9
 
 - **v1.0** — Initial upload. Window controls, mouse management, dock,
   Exposé, and the settings panel, targeting Omarchy 4.x ("Quattro").
+  
+## To Do
+For the Dock:
+- Resolve auto-hiding not working when all windows are closed
+- Add 2 icons to reveal the Omarchy menu and the desktop
+- Use a colored dot instead of (min) for minimized apps
+- Explore a second more compact dock design option (e.g. with icons) as in Ubuntu Desktop, Gnome, macOS etc. The minimal Omarchy-like option will remain default.
+
+For the Popup:
+- Switch to the font used in other navbar popups (so things look more "native")
+
+For the Exposé:
+- Provide text assistance like 'Close with "Esc" key or hover your mouse on the top/right corner'
+- Add option to choose the corner that triggers Exposé on your desktop
 
 ## Installation
 
