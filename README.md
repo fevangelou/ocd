@@ -52,6 +52,7 @@ For the Dock:
 - Add 2 icons to reveal the Omarchy menu and the desktop
 - Use a colored dot instead of (min) for minimized apps
 - Explore a second more compact dock design option (e.g. with icons) as in Ubuntu Desktop, Gnome, macOS etc. The minimal Omarchy-like option will remain default.
+- Explore if it's possible to enable drag and drop for app tabs
 
 For the Popup:
 - Switch to the font used in other navbar popups (so things look more "native")
