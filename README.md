@@ -127,6 +127,11 @@ If `ocd` itself isn't on your PATH, run the underlying script directly:
 
 ## Changelog
 
+- **v1.2** — Added `ocd uninstall` (aliases: `remove`, `purge`) so
+  uninstalling lives on the CLI alongside `apply`/`status`/`update`
+  instead of only a standalone script. Added `ocd upgrade` as an alias
+  for `ocd update`. Fixed `ocd status` showing a tagged release as
+  `<untagged>` after an update or fresh install.
 - **v1.1** — Added `ocd update` (plus `--main` for pulling an unreleased
   dev build) to update in place from the latest published release without
   a reinstall. `boot.sh` now pins to that release's exact commit instead

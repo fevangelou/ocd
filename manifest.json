@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.fevangelou.ocd",
   "name": "Classic Desktop for Omarchy (OCD)",
-  "version": "1.1",
+  "version": "1.2",
   "author": "Fotis Evangelou",
   "license": "GPL-3.0",
   "description": "A plugin/mod to ease the transition from 'traditional' desktops (Windows, MacOS, Gnome, KDE etc.), while respecting Omarchy's desktop paradigm",
