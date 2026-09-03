@@ -62,6 +62,8 @@ Flags (apply):
 Flags (update):
   --dry-run             Show what would be fetched/installed, change nothing
   --yes                 Don't prompt for confirmation before updating
+  --main                Fetch the current tip of 'main' instead of the
+                         latest published release (development use only)
 
 features.json is safe to edit by hand — follow with `ocd apply`.
 EOF
@@ -194,11 +196,12 @@ cmd_apply() {
 }
 
 cmd_update() {
-    local dry=0 yes=0
+    local dry=0 yes=0 use_main=0
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --dry-run) dry=1; DRY_RUN=1 ;;
             --yes) yes=1 ;;
+            --main) use_main=1 ;;
             *) ocd_die "unknown flag to 'ocd update': $1" ;;
         esac
         shift
@@ -206,28 +209,36 @@ cmd_update() {
 
     command -v git >/dev/null 2>&1 || ocd_die "git is required to update (sudo pacman -S --needed git)"
 
-    ocd_info "Checking $OCD_REPO_URL for the latest published release..."
-    local latest_tag latest_sha installed_sha
-    latest_tag="$(ocd_latest_release_tag)"
-    [[ -n "$latest_tag" ]] || ocd_die "no published release tag found on $OCD_REPO_URL"
-    latest_sha="$(ocd_tag_sha "$latest_tag")"
-    [[ -n "$latest_sha" ]] || ocd_die "could not resolve $latest_tag to a commit"
+    local target_label target_sha installed_sha
     installed_sha="$(ocd_installed_sha)"
 
-    if [[ -n "$installed_sha" && "$installed_sha" == "$latest_sha" ]]; then
-        ocd_info "Already up to date: $latest_tag ($latest_sha)"
+    if [[ "$use_main" == "1" ]]; then
+        ocd_warn "--main: fetching the current tip of 'main' instead of a published release. Development use only — this is not a reviewed, pinned commit."
+        target_label="main"
+        target_sha="$(ocd_branch_sha main)"
+        [[ -n "$target_sha" ]] || ocd_die "could not resolve 'main' on $OCD_REPO_URL"
+    else
+        ocd_info "Checking $OCD_REPO_URL for the latest published release..."
+        target_label="$(ocd_latest_release_tag)"
+        [[ -n "$target_label" ]] || ocd_die "no published release tag found on $OCD_REPO_URL"
+        target_sha="$(ocd_tag_sha "$target_label")"
+        [[ -n "$target_sha" ]] || ocd_die "could not resolve $target_label to a commit"
+    fi
+
+    if [[ -n "$installed_sha" && "$installed_sha" == "$target_sha" ]]; then
+        ocd_info "Already up to date: $target_label ($target_sha)"
         return 0
     fi
 
     if [[ -n "$installed_sha" ]]; then
-        ocd_info "Update available: $latest_tag ($latest_sha) — currently installed: $installed_sha"
+        ocd_info "Update available: $target_label ($target_sha) — currently installed: $installed_sha"
     else
-        ocd_info "Update available: $latest_tag ($latest_sha) — no installed version on record"
+        ocd_info "Update available: $target_label ($target_sha) — no installed version on record"
     fi
 
     if [[ "$yes" != "1" && "$dry" != "1" ]]; then
         local reply
-        read -r -p "Update ocd to $latest_tag now? [y/N] " reply || reply="n"
+        read -r -p "Update ocd to $target_label now? [y/N] " reply || reply="n"
         [[ "$reply" =~ ^[Yy]$ ]] || { ocd_info "Update cancelled."; return 0; }
     fi
 
@@ -241,13 +252,13 @@ cmd_update() {
     trap cleanup_update EXIT
 
     clone_dir="$(mktemp -d "${TMPDIR:-/tmp}/ocd-update.XXXXXX")"
-    ocd_info "Fetching $latest_tag ($latest_sha)..."
-    ocd_fetch_pinned "$latest_sha" "$clone_dir"
+    ocd_info "Fetching $target_label ($target_sha)..."
+    ocd_fetch_pinned "$target_sha" "$clone_dir"
 
-    [[ -f "$clone_dir/install.sh" ]] || ocd_die "install.sh missing from $latest_tag"
+    [[ -f "$clone_dir/install.sh" ]] || ocd_die "install.sh missing from $target_label"
     chmod +x "$clone_dir/install.sh"
 
-    ocd_info "Re-running the installer from $latest_tag — existing feature toggles are preserved..."
+    ocd_info "Re-running the installer from $target_label — existing feature toggles are preserved..."
     local install_args=()
     [[ "$dry" == "1" ]] && install_args+=(--dry-run)
     "$clone_dir/install.sh" "${install_args[@]}"

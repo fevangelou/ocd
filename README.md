@@ -100,6 +100,10 @@ Your feature toggles in `features.json` are left exactly as they are; only
 (skip the confirmation prompt). `ocd status` shows the currently installed
 tag/commit.
 
+`ocd update --main` fetches whatever `main` currently points to instead of
+the latest release — for development use only, not a reviewed/pinned
+commit.
+
 ## Uninstallation
 
 ```sh

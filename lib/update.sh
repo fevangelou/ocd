@@ -71,6 +71,16 @@ ocd_tag_sha() {
         '
 }
 
+# ocd_branch_sha <branch>: resolves a branch name to its current tip commit
+# SHA via ls-remote. Used only by `ocd update --main` (dev/testing) — the
+# resolved SHA still goes through ocd_fetch_pinned's fetch-by-SHA-then-verify
+# below, so even a branch update never silently runs whatever `main` drifts
+# to mid-fetch, just whatever it was at the moment it was resolved.
+ocd_branch_sha() {
+    local branch="$1"
+    git ls-remote --heads "$OCD_REPO_URL" "$branch" 2>/dev/null | awk '{print $1}'
+}
+
 # ocd_fetch_pinned <sha> <dest_dir>: fetch + detached-checkout exactly <sha>,
 # then verify the checkout really is that commit. Identical mechanism to
 # boot.sh's install-time pin (see boot.sh for why `git clone --branch` can't
