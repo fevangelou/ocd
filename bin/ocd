@@ -53,6 +53,7 @@ Commands:
   control-style [style]    Print the current titlebar button style, or set it
                             (solid|text) in features.json (does not apply)
   update                   Check for and install the latest published release
+                            (alias: upgrade)
   uninstall                Fully revert ocd (aliases: remove, purge)
   help                     Show this message
 
@@ -294,7 +295,7 @@ main() {
         enable) cmd_enable "$@" ;;
         disable) cmd_disable "$@" ;;
         control-style) cmd_control_style "$@" ;;
-        update) cmd_update "$@" ;;
+        update|upgrade) cmd_update "$@" ;;
         uninstall|remove|purge) cmd_uninstall "$@" ;;
         help|-h|--help) ocd_usage ;;
         *) ocd_error "unknown command: $cmd"; ocd_usage; exit 1 ;;
