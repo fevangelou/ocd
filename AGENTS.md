@@ -4,8 +4,12 @@ This file is for an AI agent (or future you) picking this project back up in
 a fresh session, possibly on a different machine. `README.md` is the
 user-facing doc; this one is the internal one — architecture, the live-test
 loop, and every non-obvious gotcha hit during development so they don't get
-rediscovered the hard way. `RESEARCH.md` has the deep-dive investigation
-trail for specific technical claims (cite it, don't re-derive it).
+rediscovered the hard way. The project's original pre-implementation
+research pass (`RESEARCH.md`, now folded into this file and removed) checked
+every upstream claim below against a fetched source rather than relying on
+model memory, since Omarchy Quattro shipped after the model's training
+cutoff — the confirmed facts worth keeping are under "Confirmed upstream
+facts" below.
 
 ## What this project is
 
@@ -31,10 +35,6 @@ existing Hyprland power user. Every UX decision should be judged against
 - `boot.sh` — the `curl | bash` entry point; shallow-clones the repo and
   hands off to `install.sh`. Both take zero interactive input (everything
   flag-driven), since a pipe has no TTY to read from.
-- `RESEARCH.md` — investigation trail for specific claims (Chromium appId
-  format, hyprctl dispatch syntax on this Hyprland build, hyprpm pin
-  behavior, etc). Read before re-investigating something that sounds like
-  it's already been nailed down here.
 
 ## Development is done live, on a real machine
 
@@ -96,7 +96,10 @@ and not yet committed back, or vice versa.
   function calls on the same singleton work fine (`Color.foreground`,
   `Style.space(n)`). If a color/size looks wrong or missing only on a
   manually-installed plugin, suspect this before anything else. Not fully
-  root-caused — see `RESEARCH.md`'s open items.
+  root-caused — two independent instances hit (Exposé's `Color.popups.text`,
+  the settings panel's `Style.bar.sizeHorizontal`), both worked around by
+  switching to a top-level property/function instead of chasing the root
+  cause further.
 - **`Style.space(px)`** — the shell's spacing-scale helper
   (`/usr/share/omarchy/shell/Commons/Style.qml`):
   `Math.max(1, Math.round(px * effectiveSpacingScale))`, ≈1:1 px at default
@@ -127,8 +130,19 @@ and not yet committed back, or vice versa.
   instead. The targeting field for a specific window is `window`, not
   `address` — `address` is silently accepted and silently ignored,
   targeting whatever's currently focused instead. This bit every restore
-  path (`lib/minimize.sh`, `Dock.qml`, `Expose.qml`) before being caught —
-  see `RESEARCH.md`'s addendum for the full trail.
+  path (`lib/minimize.sh`, `Dock.qml`, `Expose.qml`) before being caught;
+  the correct field name was found by triggering Hyprland's own
+  argument-validation error (calling with the wrong field name lists the
+  real accepted ones). Root-caused via `hyprctl repl`, which prints full
+  return values/errors — `hyprctl eval` only prints `ok`/`error`, so use
+  `repl` for interactive debugging and `eval` once the call is known-good.
+- Related: `Quickshell.Hyprland`'s toplevel `.address` is formatted
+  **without** the `0x` prefix that `hyprctl`'s own JSON and window
+  selectors (`"address:0x..."`) use — a real window's address was
+  `0x55706a59d720` per `hyprctl clients -j`, but the toplevel model reported
+  it as `55706a59d720`. Normalize with a `0x` prefix wherever a toplevel
+  address feeds a `hyprctl`/`hl.dsp.*` selector (already done in
+  `Dock.qml`/`Expose.qml` at the point each reads `t.address`).
 - `hyprpm` shells out to `sudo`/`doas`/`run0` **itself**, internally, for
   the state-store bootstrap and for installing headers after a fresh
   Hyprland checkout — it refuses to be run as root itself. Non-interactive
@@ -152,6 +166,66 @@ and not yet committed back, or vice versa.
   `window-controls` feature flag — an unloaded/failed hyprbars build
   referencing those keys crashes *all* of Hyprland's Lua config load, not
   just window-controls.
+
+## Confirmed upstream facts (from the original research pass)
+
+Omarchy Quattro shipped after the model's training cutoff, so these were
+checked against a fetched source rather than recalled, before any
+implementation code was written. Still true as of this build; re-verify
+against the shell/plugin docs directly if something here stops matching
+observed behavior.
+
+- **Third-party plugin install location**: `~/.config/omarchy/plugins/<id>/`
+  — a directory per plugin id, picked up by IPC `rescanPlugins`. Confirmed
+  live: `omarchy plugin list --json` and `omarchy-shell shell listPlugins`
+  return identical JSON (`id`, `name`, `kinds`, `enabled`, `active`,
+  `canDisable`, `firstParty`, `clonedFrom`). `shell.json`'s `plugins: []`
+  only records *deviations* from default state — several first-party
+  widgets showed `enabled: false` there despite `plugins[]` being empty —
+  so ocd never hand-patches `shell.json` for enablement; every enable/
+  disable goes through IPC (`setPluginEnabled`) or the `omarchy plugin` CLI.
+- **`omarchy plugin validate <folder>`** exists and is worth running against
+  any manifest before deploying it — confirmed it actually catches a
+  deliberately-broken manifest (not a no-op check).
+- **A `service`-kind plugin owning its own layer-shell `PanelWindow` is a
+  supported, first-party-used pattern**, not just a `bar-widget` — Omarchy's
+  own `omarchy.background` plugin does exactly this
+  (`shell/plugins/background/Background.qml`). This is why the dock is a
+  `service` plugin here rather than a bar-widget: a bar-widget rides
+  wherever the user has dragged the bar and can't independently auto-hide
+  at a screen edge.
+- **Chromium web-app WM_CLASS/appId format**: `chrome-<host>_<path>-<Profile>`
+  (`/` → `_`), fixed at window creation — confirmed from an upstream Omarchy
+  GitHub discussion on web-app windows. E.g. a Gmail tab at
+  `mail.google.com/mail/u/0` reports
+  `chrome-mail.google.com_mail_u_0-Default`. This is what
+  `plugin/{dock,expose}/AppMatcher.js`'s seed map and
+  `appid-overrides.json` schema are built against.
+- **hyprbars/hyprpm commit pinning**: `hyprland-plugins` ships its own
+  Hyprland-commit → plugin-commit pin table that `hyprpm` resolves
+  automatically against whatever Hyprland is installed — ocd deliberately
+  does not hand-pin a commit itself (that would fight hyprpm's own
+  resolution and go stale immediately). The one failure mode worth handling
+  is documented in the hyprpm gotchas above ("Headers outdated").
+- **`shell.json` schema**: `version: 1`, `bar.id` selects the active bar,
+  one entry per plugin instance (bar widgets under `bar.layout.<section>`,
+  everything else under top-level `plugins[]`), settings live **inline on
+  the entry** — no `config:` sub-object, no deep-merge with defaults once
+  hand-edited. This is why `ocd`'s own settings live in their own files
+  (`features.json`, `dock-pins.json`, `appid-overrides.json`) rather than
+  inline on a `shell.json` entry, and why `lib/jsonpatch.sh` patches with
+  `jq` rather than ever overwriting the file wholesale.
+- No community Exposé-style window switcher (live previews + type-to-search)
+  existed at research time — `gardnmi/omarchy-minimize` (MIT) is the closest
+  prior art (hover-triggered live preview via Quickshell's toplevel-export
+  integration, same shape ocd's Exposé independently follows: still-frame
+  by default, promote to live only while hovered/focused, tear the stream
+  down on close) and `rosakodu/omarchy-dock` (MIT) is a bar-widget dock with
+  its own separate pin-list file (ocd's dock instead follows the documented
+  inline-`shell.json` convention, and reading `rosakodu`'s pin file is a
+  plausible conflict signature to scan for at install time). See the
+  README's Acknowledgements section — both are credited there, not
+  vendored.
 
 ## File header / license convention
 

@@ -10,7 +10,7 @@
 // AppMatcher.js — appId -> {name, icon} resolution for ocd's dock/Exposé.
 //
 // Chromium web apps launched by Omarchy report WM_CLASS/appId in the form
-// chrome-<host>_<path>-<Profile> (confirmed format, see RESEARCH.md §5),
+// chrome-<host>_<path>-<Profile> (confirmed format, see AGENTS.md),
 // which a normal desktop-entry-by-class lookup won't match. ocd keeps a
 // small built-in seed map for Omarchy's stock web apps plus a user-editable
 // override at ~/.config/omarchy/ocd/appid-overrides.json, which is merged

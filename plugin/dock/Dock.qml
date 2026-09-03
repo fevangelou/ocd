@@ -42,7 +42,7 @@ Item {
   // ocd's own file (not inline on a shell.json entry): the inline-settings
   // convention documented for shell.json is specific to bar-widget kind
   // entries, and the dock is a service kind here, with no confirmed
-  // equivalent — see RESEARCH.md.
+  // equivalent — see AGENTS.md.
   readonly property string pinsPath: configDir + "/dock-pins.json"
   readonly property string ocdBin: home + "/.local/share/ocd/bin/ocd"
 

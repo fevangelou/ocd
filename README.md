@@ -119,6 +119,24 @@ inspectable source, and `features.json`/`appid-overrides.json`/
 
 Did we mention it was live-built on Omarchy?
 
+## Acknowledgements
+
+Thank you to [DHH](https://github.com/dhh) and the whole Omarchy community —
+without Omarchy itself, and the welcoming, keyboard-driven desktop it
+introduced to so many newcomers, this mod wouldn't have a home to exist in.
+
+No code from any other plugin is vendored here, but two projects were read
+as prior art during research and are worth crediting directly:
+
+- [`gardnmi/omarchy-minimize`](https://github.com/gardnmi/omarchy-minimize) —
+  its hover-triggered live preview (still-frame by default, promoted to a
+  live capture stream only while hovered/focused, torn down on close)
+  independently informed the same approach in Exposé.
+- [`rosakodu/omarchy-dock`](https://github.com/rosakodu/omarchy-dock) — an
+  earlier bar-widget dock for Omarchy; its existence helped confirm that
+  Chromium PWA icon matching is a real, shared pain point worth solving
+  properly here.
+
 ## License
 
 GNU General Public License v3.0 (GPLv3) — see [`LICENSE`](LICENSE).

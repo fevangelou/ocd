@@ -8,7 +8,7 @@
 #  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
 #  */
 
-# hyprbars lifecycle via hyprpm. Per RESEARCH.md §3: hyprland-plugins ships
+# hyprbars lifecycle via hyprpm. hyprland-plugins ships
 # its own Hyprland-commit -> plugin-commit pin table that hyprpm resolves
 # automatically, so ocd does not hand-pin a commit — it calls plain
 # hyprpm add/enable and handles the documented "Headers outdated" failure
