@@ -21,13 +21,12 @@
 set -euo pipefail
 
 OCD_REPO_URL="${OCD_REPO_URL:-https://github.com/fevangelou/ocd.git}"
-# Pinned to the exact commit tagged v1.0 so `curl | bash` always runs the
-# code that was actually reviewed for the plugin marketplace listing, not
-# whatever `main` has since moved to. Override for testing with
-# `OCD_REF=<branch|tag|sha>` — the post-checkout pin verification below is
-# skipped for a non-SHA override since there's nothing fixed to check it
-# against.
-OCD_REF="${OCD_REF:-332b98067426f6c232dfb41334e0ad1f0592d89a}"
+# Pinned to the exact commit tagged v1.1 so `curl | bash` always runs a
+# released, known commit, not whatever `main` has since moved to. Override
+# for testing with `OCD_REF=<branch|tag|sha>` — the post-checkout pin
+# verification below is skipped for a non-SHA override since there's
+# nothing fixed to check it against.
+OCD_REF="${OCD_REF:-1462f8eb8e91d0077a889565288091656a9e3642}"
 
 ocd_boot_log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 ocd_boot_die() { printf '\033[1;31m==> error:\033[0m %s\n' "$*" >&2; exit 1; }
