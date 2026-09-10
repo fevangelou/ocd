@@ -23,7 +23,8 @@ Embrace Minimize, Maximize or Close in Omarchy - or as I'd like to call it: Dock
 **Features:**
 
 - **Window controls** — real titlebars with minimize / maximize / close
-  buttons (via [hyprbars](https://github.com/hyprwm/hyprland-plugins/tree/main/hyprbars))
+  buttons (via [hyprbars](https://github.com/hyprwm/hyprland-plugins/tree/main/hyprbars)),
+  which show their glyphs on hover; double-click a titlebar to maximize
 - **Mouse window management** — resize from a window's own border with no
   modifier key held (Omarchy already ships SUPER+drag to move/resize)
 - **Dock** — running windows plus your pinned apps, along the bottom edge;
@@ -148,14 +149,20 @@ window first (SUPER+T) if you want freeform drag.
 
 ## Changelog
 
-- **v1.4** — The dock now hides itself when it has nothing to show, instead
-  of sitting at the bottom of the screen as an empty strip that still
-  reserves space; it reappears the moment a window opens. Pinned apps still
-  count as something to show, so a dock with pins stays put. Moved the
-  Exposé hot corner from the top-right to the **bottom-right**. `ocd status`
-  no longer dumps the raw `listPlugins` JSON for every plugin on the system
-  — it prints just OCD's own plugins and their state, with `--full` for the
-  raw dump when debugging.
+- **v1.4** — **Double-click a titlebar to maximize/restore**, matching the
+  middle control button. The control buttons now **reveal their glyphs
+  (`─ □ ×`) on hover** and stay bare colored circles at rest; hyprbars has
+  no text tooltips, and this is its supported equivalent — note that
+  hovering any one button reveals all three, which is how hyprbars scopes
+  it. The buttons are also **larger and further apart** (18px across, 30px
+  centre to centre). The dock now **hides itself when it has nothing to
+  show**, instead of sitting at the bottom of the screen as an empty strip
+  that still reserves space; it reappears the moment a window opens, and
+  pinned apps count as something to show, so a dock with pins stays put.
+  Moved the **Exposé hot corner to the bottom-right** (was top-right).
+  `ocd status` no longer dumps the raw `listPlugins` JSON for every plugin
+  on the system — it prints just OCD's own plugins and their state, with
+  `--full` for the raw dump when debugging.
 - **v1.3** — Fixed window controls failing to load, both on a fresh install
   and after upgrading to Omarchy 4.0.3. Stale plugin headers block
   `hyprpm add`, and without the repo cloned `hyprpm enable` can only ever
@@ -199,10 +206,8 @@ For the Exposé:
 - Provide text assistance like 'Close with the "Esc" key'
 
 For the Window Controls:
-- Tooltip when hovering on each control
-- Consider +, - & inside each respective control (or as an option to toggle in the settings popup)
+- Real text tooltips on each control (hyprbars has no tooltip support — the controls currently reveal their glyphs on hover instead)
 - Consider 4th control for allowing the window to float
-- Consider "double-click on window title" action to maximize/restore window size
 
 Global:
 - Update along with `omarchy update`, either by default or as an option to enable in the settings popup.
