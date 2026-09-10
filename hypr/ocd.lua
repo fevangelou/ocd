@@ -170,25 +170,43 @@ if hl.plugin and hl.plugin.hyprbars then
       plugin = {
         hyprbars = {
           on_double_click = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
+          -- Buttons are bare colored circles at rest and reveal their
+          -- glyphs on hover, so the controls stay minimal until you go
+          -- looking for them.
+          --
+          -- hyprbars has no tooltips (its button struct is just
+          -- cmd/colors/size/icon — there is no label field, and no
+          -- plugin:hyprbars:* key for one), so this is the supported
+          -- equivalent. Note the scope: hyprbars tracks hover as a bitmask
+          -- over all buttons and renders every icon when *any* of them is
+          -- hovered, so this reveals all three at once rather than
+          -- labelling just the one under the pointer.
+          icon_on_hover = true,
         },
       },
     })
 
-    -- Solid colored buttons with no glyph — red/yellow/green for
-    -- close/maximize/minimize. hyprbars' `icon` accepts plain text, so an
-    -- empty string leaves the button as a bare colored circle.
+    -- Red/yellow/green for close/maximize/minimize. Buttons are added
+    -- right-to-left, so this renders as minimize, maximize, close.
+    --
+    -- Glyphs are checked against Liberation Sans, which is what "sans"
+    -- resolves to here: hyprbars hardcodes that family for icons
+    -- (renderText(..., "sans", ...) in barDeco.cpp) rather than using
+    -- bar_text_font, so a glyph missing from it would depend on Pango
+    -- fallback. U+2715 ✕ is absent from it; U+00D7 × is present and reads
+    -- the same at this size.
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(f38ba8ff)",
       fg_color = "rgba(1e1e2eff)",
       size = 12,
-      icon = "",
+      icon = "×",
       action = "hyprctl dispatch 'hl.dsp.window.close()'",
     })
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(f9e2afff)",
       fg_color = "rgba(1e1e2eff)",
       size = 12,
-      icon = "",
+      icon = "□",
       action = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
     })
     -- Hyprland has no native "minimize": implemented as a silent move to a
@@ -198,7 +216,7 @@ if hl.plugin and hl.plugin.hyprbars then
       bg_color = "rgba(a6e3a1ff)",
       fg_color = "rgba(1e1e2eff)",
       size = 12,
-      icon = "",
+      icon = "─",
       action = [[hyprctl dispatch 'hl.dsp.window.move({ workspace = "special:minimized", follow = false })']],
     })
   end
