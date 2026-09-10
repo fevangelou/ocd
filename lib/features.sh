@@ -8,113 +8,83 @@
 #  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
 #  */
 
-# features.json: the single source of truth for which ocd features are
-# wanted. Written by the settings panel or by hand; `ocd apply` reconciles
-# actual system state to it. This file only reads/writes it and enforces the
-# dependency graph — it never mutates the system.
+# features.json: the single source of truth for whether ocd is wanted.
+# `ocd apply` reconciles actual system state to it. This file only
+# reads/writes it — it never mutates the system.
+#
+# Schema v2 replaced v1's four independent feature flags (plus a
+# windowControlsStyle sub-option) with one `enabled` boolean. ocd is a
+# single mod, not a suite: the per-feature matrix mostly produced
+# combinations nobody asked for, and it actively caused harm — a transient
+# hyprbars build failure used to write window-controls=false, silently
+# demoting what the user had actually asked for with nothing to ever
+# restore it.
 
-OCD_FEATURE_NAMES=(window-controls mouse-management dock expose)
+OCD_SCHEMA_VERSION=2
 
 ocd_features_init() {
-    [[ -f "$OCD_FEATURES_FILE" ]] && return 0
-    ocd_info "Creating default $OCD_FEATURES_FILE"
-    if ocd_dry_run; then
-        printf '[dry-run] would create default features.json at %s\n' "$OCD_FEATURES_FILE" >&2
-        return 0
-    fi
-    mkdir -p "$OCD_CONFIG_DIR"
-    cat >"$OCD_FEATURES_FILE" <<'EOF'
+    if [[ ! -f "$OCD_FEATURES_FILE" ]]; then
+        ocd_info "Creating default $OCD_FEATURES_FILE"
+        if ocd_dry_run; then
+            printf '[dry-run] would create default features.json at %s\n' "$OCD_FEATURES_FILE" >&2
+            return 0
+        fi
+        mkdir -p "$OCD_CONFIG_DIR"
+        cat >"$OCD_FEATURES_FILE" <<EOF
 {
-  "schemaVersion": 1,
-  "features": {
-    "window-controls": true,
-    "mouse-management": true,
-    "dock": true,
-    "expose": true
-  },
-  "windowControlsStyle": "solid"
+  "schemaVersion": $OCD_SCHEMA_VERSION,
+  "enabled": true
 }
 EOF
-    ocd_log "RUN" "wrote default features.json"
+        ocd_log "RUN" "wrote default features.json"
+        return 0
+    fi
+    ocd_features_migrate
 }
 
-OCD_CONTROL_STYLES=(solid text)
+# jq expression collapsing a v1 file to a single boolean. `enabled` goes
+# false only if the user had genuinely turned every feature off; any
+# feature still on — or a file with no features block at all — means the
+# mod was wanted.
+OCD_ENABLED_EXPR='if has("enabled") then (.enabled != false)
+                  else (((.features // {}) | length) == 0
+                        or (((.features // {}) | to_entries | map(.value) | any))) end'
 
-# ocd_control_style_get -> prints "solid" or "text" (default: solid)
-ocd_control_style_get() {
-    [[ -f "$OCD_FEATURES_FILE" ]] || { printf 'solid'; return 0; }
-    local val
-    val="$(ocd_json_get "$OCD_FEATURES_FILE" '.windowControlsStyle // "solid"')" || val="solid"
-    [[ "$val" == "text" ]] && printf 'text' || printf 'solid'
+ocd_features_migrate() {
+    local ver
+    ver="$(ocd_json_get "$OCD_FEATURES_FILE" '.schemaVersion // 1' 2>/dev/null)" || return 0
+    [[ "$ver" =~ ^[0-9]+$ ]] || ver=1
+    (( ver >= OCD_SCHEMA_VERSION )) && return 0
+    ocd_info "Migrating features.json to schema v$OCD_SCHEMA_VERSION (one on/off switch instead of per-feature flags)."
+    ocd_json_patch "$OCD_FEATURES_FILE" \
+        "{ schemaVersion: \$sv, enabled: ($OCD_ENABLED_EXPR) }" \
+        --argjson sv "$OCD_SCHEMA_VERSION"
 }
 
-# ocd_control_style_set <solid|text>
-ocd_control_style_set() {
-    local value="$1" s valid=0
-    for s in "${OCD_CONTROL_STYLES[@]}"; do [[ "$s" == "$value" ]] && valid=1; done
-    [[ "$valid" == "1" ]] || ocd_die "windowControlsStyle must be one of: ${OCD_CONTROL_STYLES[*]} (got '$value')"
-    ocd_features_init
-    ocd_json_patch "$OCD_FEATURES_FILE" '.windowControlsStyle = $v' --arg v "$value"
-}
-
-ocd_feature_is_valid_name() {
-    local name="$1" n
-    for n in "${OCD_FEATURE_NAMES[@]}"; do
-        [[ "$n" == "$name" ]] && return 0
-    done
-    return 1
-}
-
-# ocd_feature_get <name> -> prints "true" or "false"
-ocd_feature_get() {
-    local name="$1"
-    ocd_feature_is_valid_name "$name" || ocd_die "unknown feature '$name' (known: ${OCD_FEATURE_NAMES[*]})"
+# ocd_enabled_get -> prints "true" or "false".
+# Reads a v1 file correctly too, so a --dry-run (which writes nothing, and
+# so never migrates) still reports the right answer.
+ocd_enabled_get() {
     [[ -f "$OCD_FEATURES_FILE" ]] || { printf 'true'; return 0; }
     local val
-    val="$(ocd_json_get "$OCD_FEATURES_FILE" ".features[\"$name\"]")" || val="true"
+    val="$(ocd_json_get "$OCD_FEATURES_FILE" "$OCD_ENABLED_EXPR")" || val="true"
     [[ "$val" == "false" ]] && printf 'false' || printf 'true'
 }
 
-# ocd_feature_set <name> <true|false>
-# Only writes features.json. Does not touch the system. Validates the
-# dependency graph *after* the hypothetical change and refuses if it would
-# strand minimized windows or enable window-controls with no restore surface.
-ocd_feature_set() {
-    local name="$1" value="$2"
-    ocd_feature_is_valid_name "$name" || ocd_die "unknown feature '$name' (known: ${OCD_FEATURE_NAMES[*]})"
-    [[ "$value" == "true" || "$value" == "false" ]] || ocd_die "feature value must be true or false, got '$value'"
+# ocd_enabled_set <true|false>
+ocd_enabled_set() {
+    local value="$1"
+    [[ "$value" == "true" || "$value" == "false" ]] || ocd_die "enabled must be true or false, got '$value'"
     ocd_features_init
-
-    local dock expose window_controls
-    dock="$(ocd_feature_get dock)"
-    expose="$(ocd_feature_get expose)"
-    window_controls="$(ocd_feature_get window-controls)"
-    case "$name" in
-        dock) dock="$value" ;;
-        expose) expose="$value" ;;
-        window-controls) window_controls="$value" ;;
-    esac
-
-    if [[ "$window_controls" == "true" && "$dock" == "false" && "$expose" == "false" ]]; then
-        ocd_die "refusing: window-controls (minimize) needs at least one restore surface. Enable dock or expose first, or disable window-controls instead."
-    fi
-
-    # Disabling the last restore surface must sweep special:minimized first,
-    # so no window is ever stranded there with no way back.
-    if [[ "$name" == "dock" && "$value" == "false" && "$expose" == "false" ]] ||
-       [[ "$name" == "expose" && "$value" == "false" && "$dock" == "false" ]]; then
-        ocd_info "Disabling the last restore surface — sweeping minimized windows back to a real workspace first"
-        ocd_sweep_minimized
-    fi
-
-    ocd_json_patch "$OCD_FEATURES_FILE" ".features[\"$name\"] = \$v" --argjson v "$value"
+    # Turning ocd off takes away both restore surfaces at once, so anything
+    # parked in special:minimized would have no way back. Sweep first.
+    [[ "$value" == "false" ]] && ocd_sweep_minimized
+    ocd_json_patch "$OCD_FEATURES_FILE" \
+        '.schemaVersion = $sv | .enabled = $v' \
+        --argjson sv "$OCD_SCHEMA_VERSION" --argjson v "$value"
 }
 
 ocd_features_print_status() {
     ocd_features_init
-    local name val
-    for name in "${OCD_FEATURE_NAMES[@]}"; do
-        val="$(ocd_feature_get "$name")"
-        printf '  %-18s %s\n' "$name" "$val"
-    done
+    printf '  %-18s %s\n' "enabled" "$(ocd_enabled_get)"
 }

@@ -46,36 +46,20 @@ source "$LIB_DIR/hyprbars.sh"
 source "$LIB_DIR/update.sh"
 
 FORCE=0
-FEATURES_ARG=""
 
 ocd_install_usage() {
     cat <<'EOF'
-Usage: install.sh [--dry-run] [--force] [--features=list] [--help]
+Usage: install.sh [--dry-run] [--force] [--help]
 
   --dry-run          Print every mutation this installer would make, change nothing.
                       Recommended as your first run.
   --force             Proceed even if a conflicting community dock/Exposé plugin
                       is detected in shell.json.
-  --features=list     Comma-separated subset to enable initially (default: all).
-                      Names: window-controls (alias titlebars), mouse-management
-                      (alias mouse), dock, expose. Example:
-                      --features=titlebars,expose
   --help              Show this message.
 
-Everything gets installed regardless of --features; the flag only sets the
-initial ~/.config/omarchy/ocd/features.json state. Change it later with
-`ocd enable/disable <feature>` + `ocd apply`, or the settings panel.
+ocd installs as one mod with one switch. Turn it off later from the
+settings panel, or with `ocd disable` + `ocd apply`.
 EOF
-}
-
-ocd_normalize_feature() {
-    case "$1" in
-        window-controls|titlebars) printf 'window-controls' ;;
-        mouse-management|mouse) printf 'mouse-management' ;;
-        dock) printf 'dock' ;;
-        expose|exposé|exposeacute) printf 'expose' ;;
-        *) ocd_die "unknown feature name in --features: '$1' (known: window-controls/titlebars, mouse-management/mouse, dock, expose)" ;;
-    esac
 }
 
 parse_args() {
@@ -83,7 +67,6 @@ parse_args() {
         case "$1" in
             --dry-run) DRY_RUN=1; shift ;;
             --force) FORCE=1; shift ;;
-            --features=*) FEATURES_ARG="${1#--features=}"; shift ;;
             --help|-h) ocd_install_usage; exit 0 ;;
             *) ocd_die "unknown flag: $1 (see --help)" ;;
         esac
@@ -148,57 +131,19 @@ run_preflight() {
     fi
 }
 
-compute_initial_features() {
-    # Prints 4 lines: window-controls mouse-management dock expose (each true/false)
-    local wc=true mm=true dock=true expose=true
-    if [[ -n "$FEATURES_ARG" ]]; then
-        wc=false; mm=false; dock=false; expose=false
-        local IFS=','
-        local part
-        for part in $FEATURES_ARG; do
-            case "$(ocd_normalize_feature "$part")" in
-                window-controls) wc=true ;;
-                mouse-management) mm=true ;;
-                dock) dock=true ;;
-                expose) expose=true ;;
-            esac
-        done
-    fi
-    if [[ "$wc" == "true" && "$dock" == "false" && "$expose" == "false" ]]; then
-        ocd_die "--features=$FEATURES_ARG requests window-controls (minimize) with no restore surface. Include dock and/or expose."
-    fi
-    printf '%s\n%s\n%s\n%s\n' "$wc" "$mm" "$dock" "$expose"
-}
-
 write_initial_features_file() {
-    local wc="$1" mm="$2" dock="$3" expose="$4"
     # install.sh is safe/expected to re-run — a fresh install, a re-run
     # after a partial failure, or `ocd update` re-invoking it from a newer
     # release. An existing features.json means this isn't a first install,
-    # so leave the user's feature toggles alone unless they explicitly
-    # asked to reset them via --features.
-    if [[ -f "$OCD_FEATURES_FILE" && -z "$FEATURES_ARG" ]]; then
-        ocd_info "Existing features.json found — leaving your feature toggles as-is (pass --features=... to reset them)."
+    # so leave the user's setting alone; ocd_features_init also migrates a
+    # v1 file to the single-switch schema in passing.
+    if [[ -f "$OCD_FEATURES_FILE" ]]; then
+        ocd_info "Existing features.json found — leaving your setting as-is."
+        ocd_features_init
         return 0
     fi
-    ocd_info "Writing initial features.json (window-controls=$wc mouse-management=$mm dock=$dock expose=$expose)"
-    if ocd_dry_run; then
-        printf '[dry-run] would write %s\n' "$OCD_FEATURES_FILE" >&2
-        return 0
-    fi
-    mkdir -p "$OCD_CONFIG_DIR"
-    cat >"$OCD_FEATURES_FILE" <<EOF
-{
-  "schemaVersion": 1,
-  "features": {
-    "window-controls": $wc,
-    "mouse-management": $mm,
-    "dock": $dock,
-    "expose": $expose
-  }
-}
-EOF
-    ocd_log "RUN" "wrote initial features.json"
+    ocd_info "Writing initial features.json (enabled=true)"
+    ocd_features_init
 }
 
 install_files() {
@@ -245,12 +190,9 @@ main() {
 
     run_preflight
 
-    local wc mm dock expose
-    { read -r wc; read -r mm; read -r dock; read -r expose; } < <(compute_initial_features)
-
     install_files
     ocd_record_installed_ref "$REPO_DIR"
-    write_initial_features_file "$wc" "$mm" "$dock" "$expose"
+    write_initial_features_file
 
     ocd_info "Reconciling system state via 'ocd apply'..."
     local apply_args=() ocd_bin="$OCD_INSTALL_DIR/bin/ocd"

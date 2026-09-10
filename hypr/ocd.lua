@@ -20,16 +20,24 @@
 
 local FEATURES_FILE = os.getenv("HOME") .. "/.config/omarchy/ocd/features.json"
 
--- ocd_feature(name): reads features.json via jq. Fails open (returns true)
--- if the file or jq is missing, so a fresh install behaves sanely before the
--- first `ocd apply` has run.
-local function ocd_feature(name)
+-- ocd_enabled(): reads the single on/off switch from features.json via jq.
+-- Fails open (returns true) if the file or jq is missing, so a fresh
+-- install behaves sanely before the first `ocd apply` has run.
+--
+-- Understands both schemas. A v1 file (four independent feature flags) is
+-- read as "on unless the user had turned everything off", matching the
+-- migration in lib/features.sh — Hyprland may well load this file before
+-- `ocd apply` has had a chance to rewrite it.
+local function ocd_enabled()
   local f = io.open(FEATURES_FILE, "r")
   if not f then
     return true
   end
   f:close()
-  local cmd = string.format("jq -r '.features[%q] // empty' %q 2>/dev/null", name, FEATURES_FILE)
+  local expr = 'if has("enabled") then (.enabled != false) ' ..
+    'else (((.features // {}) | length) == 0 ' ..
+    'or (((.features // {}) | to_entries | map(.value) | any))) end'
+  local cmd = string.format("jq -r %q %q 2>/dev/null", expr, FEATURES_FILE)
   local handle = io.popen(cmd)
   if not handle then
     return true
@@ -43,36 +51,8 @@ local function ocd_feature(name)
   return true
 end
 
--- ocd_string_setting(jqPath, default): same fail-open shape as ocd_feature,
--- for a top-level (non-boolean, non-"features"-nested) string setting.
-local function ocd_string_setting(jqPath, default)
-  local f = io.open(FEATURES_FILE, "r")
-  if not f then
-    return default
-  end
-  f:close()
-  local cmd = string.format("jq -r '%s // empty' %q 2>/dev/null", jqPath, FEATURES_FILE)
-  local handle = io.popen(cmd)
-  if not handle then
-    return default
-  end
-  local result = handle:read("*a")
-  handle:close()
-  result = result:gsub("%s+", "")
-  if result == "" then
-    return default
-  end
-  return result
-end
-
-local mouse_management = ocd_feature("mouse-management")
-local window_controls = ocd_feature("window-controls")
-local dock_enabled = ocd_feature("dock")
-local expose_enabled = ocd_feature("expose")
--- "solid" (default, icon glyphs on colored backgrounds) or "text" — a nod
--- to DHH: close/maximize/minimize become the initials "Halt"/"Hoist"/"Dock"
--- on the same green/yellow/red backgrounds, spelling D-H-H top to bottom.
-local control_style = ocd_string_setting(".windowControlsStyle", "solid")
+-- One switch for the whole mod. Everything below follows it together.
+local enabled = ocd_enabled()
 
 --------------------------------------------------------------------------
 -- Component 2: mouse window management
@@ -87,7 +67,7 @@ local control_style = ocd_string_setting(".windowControlsStyle", "solid")
 -- to one `section:key` variable, same as the .conf era) so this only
 -- touches resize_on_border — it does not reset gaps, borders, or anything
 -- else general.* already has set.
-if mouse_management then
+if enabled then
   hl.config({
     general = {
       resize_on_border = true,
@@ -117,7 +97,7 @@ end
 -- since those are the two surfaces whose whole point is "click a tab/tile
 -- to focus a window you weren't already pointing at" — the only place this
 -- warp is actually disruptive.
-if dock_enabled or expose_enabled then
+if enabled then
   hl.config({
     cursor = {
       no_warps = true,
@@ -136,10 +116,10 @@ end
 -- actually loaded. This isn't a no-op when it's absent: Hyprland's config
 -- parser rejects unknown plugin:hyprbars:* keys, and calling into a nil
 -- hl.plugin.hyprbars crashes Lua config loading outright — taking every
--- other ocd feature down with it, not just window-controls. A failed or
+-- of ocd down with it, not just the titlebars. A failed or
 -- not-yet-attempted hyprbars build (see lib/hyprbars.sh) must never do
 -- that, so the entire block is guarded on the plugin actually being loaded
--- right now, not just on the window-controls feature flag.
+-- right now, not just on ocd being enabled.
 --
 -- Colors are intentionally plain and centralized here rather than pulled
 -- from Omarchy's live theme: hyprbars renders its titlebar at Hyprland
@@ -178,29 +158,22 @@ if hl.plugin and hl.plugin.hyprbars then
     },
   })
 
-  if window_controls then
-    -- "text" style: close/maximize/minimize become "H"/"H"/"D" — Halt,
-    -- Hoist, Dock — on the same colors as "solid", spelling D-H-H bottom to
-    -- top (green->yellow->red) as a nod to DHH. hyprbars' own README
-    -- confirms `icon` accepts plain text directly, not just icon-font
-    -- glyphs — its own Lua example uses icon = "X" and icon = "_".
-    local close_icon, maximize_icon, minimize_icon = "", "", ""
-    if control_style == "text" then
-      close_icon, maximize_icon, minimize_icon = "H", "H", "D"
-    end
-
+  if enabled then
+    -- Solid colored buttons with no glyph — red/yellow/green for
+    -- close/maximize/minimize. hyprbars' `icon` accepts plain text, so an
+    -- empty string leaves the button as a bare colored circle.
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(f38ba8ff)",
       fg_color = "rgba(1e1e2eff)",
       size = 12,
-      icon = close_icon,
+      icon = "",
       action = "hyprctl dispatch 'hl.dsp.window.close()'",
     })
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(f9e2afff)",
       fg_color = "rgba(1e1e2eff)",
       size = 12,
-      icon = maximize_icon,
+      icon = "",
       action = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
     })
     -- Hyprland has no native "minimize": implemented as a silent move to a
@@ -210,7 +183,7 @@ if hl.plugin and hl.plugin.hyprbars then
       bg_color = "rgba(a6e3a1ff)",
       fg_color = "rgba(1e1e2eff)",
       size = 12,
-      icon = minimize_icon,
+      icon = "",
       action = [[hyprctl dispatch 'hl.dsp.window.move({ workspace = "special:minimized", follow = false })']],
     })
   end
@@ -219,7 +192,7 @@ end
 -- Minimize keybind: parity with the titlebar button, but a pure Hyprland
 -- dispatcher unrelated to hyprbars — it keeps working even if hyprbars
 -- failed to build, same as every other ocd feature.
-if window_controls then
+if enabled then
   o.bind(
     "SUPER + H",
     "Minimize window",
@@ -234,12 +207,17 @@ end
 -- routes a plain string dispatcher through hl.dsp.exec_cmd(), so this is a
 -- normal shell command, same pattern Omarchy itself uses for its own
 -- omarchy-hyprland-* helper scripts.
-o.bind(
-  "SUPER + E",
-  "Toggle Exposé (ocd)",
-  "omarchy-shell shell toggle io.github.fevangelou.ocd.expose"
-)
+if enabled then
+  o.bind(
+    "SUPER + E",
+    "Toggle Exposé (ocd)",
+    "omarchy-shell shell toggle io.github.fevangelou.ocd.expose"
+  )
+end
 
+-- Deliberately NOT gated on `enabled`: the settings panel is how ocd gets
+-- turned back on. Taking its keybind away along with everything else would
+-- leave hand-editing features.json as the only way back.
 o.bind(
   "SUPER + COMMA",
   "Toggle ocd settings",

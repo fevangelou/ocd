@@ -29,11 +29,13 @@ Embrace Minimize, Maximize or Close in Omarchy - or as I'd like to call it: Dock
 - **Dock** — running windows plus your pinned apps, auto-hiding at the
   bottom edge
 - **Exposé** — every open window as a live preview, type-to-search, SUPER+E
-- **Settings panel** — a bar icon and popup to toggle every feature above
-  independently, live, no config file editing required
+- **Settings panel** — a bar icon and popup to turn OCD on or off, live, no
+  config file editing required
 
-Every feature can be turned on or off independently, at any time, from the
-settings panel or the `ocd` CLI. Nothing here is vendored from another
+OCD is a single mod with a single on/off switch, in the settings panel or
+via the `ocd` CLI — it works fully or not at all, rather than as a matrix of
+independently-toggled parts. Turning it off leaves the settings panel in
+place so you can turn it back on. Nothing here is vendored from another
 plugin, and installing refuses to proceed (without `--force`) if it detects
 a conflicting community dock/Exposé plugin already set up.
 
@@ -70,12 +72,11 @@ Both entry points take the same flags:
 |---|---|
 | `--dry-run` | Print every mutation, change nothing. |
 | `--force` | Proceed even if a conflicting community dock/Exposé plugin is detected. |
-| `--features=list` | Comma-separated subset to enable initially (default: all). Names: `window-controls`, `mouse-management`, `dock`, `expose`. |
 
-`--features` only sets the *initial* state — every component still gets
-installed either way, and you can flip anything later from the settings
-panel (bar icon, or SUPER+,) or with `ocd enable/disable <feature>` +
-`ocd apply`.
+OCD is one mod with one switch. Turn it off later from the settings panel
+(bar icon, or SUPER+,) or with `ocd disable` + `ocd apply`; turning it off
+leaves the settings panel itself in place, so you can always turn it back
+on.
 
 Requires a live Omarchy 4.x session — the installer checks this itself and
 refuses to run on anything else.
@@ -95,10 +96,9 @@ ocd update
 Checks the repository for the latest published release tag, and if it's
 newer than what's installed, fetches and re-runs the installer from that
 exact pinned commit — same trust model as the initial install, never `main`.
-Your feature toggles in `features.json` are left exactly as they are; only
-`--features=list` on a fresh install sets them. Flags: `--dry-run`, `--yes`
-(skip the confirmation prompt). `ocd status` shows the currently installed
-tag/commit.
+Your on/off setting in `features.json` is left exactly as it is. Flags:
+`--dry-run`, `--yes` (skip the confirmation prompt). `ocd status` shows the
+currently installed tag/commit.
 
 `ocd update --main` fetches whatever `main` currently points to instead of
 the latest release — for development use only, not a reviewed/pinned
@@ -125,8 +125,40 @@ If `ocd` itself isn't on your PATH, run the underlying script directly:
 ./uninstall.sh
 ```
 
+## Known limitations
+
+**Toggling from the settings panel can't change the titlebars.** hyprbars
+is a compiled Hyprland plugin managed by `hyprpm`, and every hyprpm state
+change ends in an internal `sudo install ... /var/cache/hyprpm/...` — it
+needs root, and `sudo` reads its password from `/dev/tty`. The settings
+panel runs inside Quickshell, which has no controlling terminal, so that
+prompt can never appear. Everything else in the toggle (the dock, Exposé,
+mouse management) applies immediately; OCD then sends a notification saying
+the titlebar half is pending. Run `ocd apply` in a terminal to finish it.
+
+**Titlebar colors don't follow the live theme.** hyprbars renders its
+titlebar at Hyprland config-load time, and Omarchy's theme switcher doesn't
+currently expose a stable Lua-readable "current theme colors" source. The
+colors are set in `hypr/ocd.lua`; retinting needs a config reload.
+
+**Dragging a tiled window swaps it rather than moving it freely.** That's
+Hyprland's dwindle/master behavior, not something OCD overrides — float the
+window first (SUPER+T) if you want freeform drag.
+
 ## Changelog
 
+- **v1.3** — Fixed window controls failing to load, both on a fresh install
+  and after upgrading to Omarchy 4.0.3: hyprpm re-creates its own
+  `/var/cache/hyprpm/<user>/` as root during a privileged build and then
+  can't write to it, so ocd now repairs ownership around *every* hyprpm
+  call and verifies against `hyprctl plugin list` rather than trusting an
+  exit code. Fixed `curl | bash` aborting at the dependency step. Collapsed
+  the four per-feature toggles into **one on/off switch** (`features.json`
+  schema v2, migrated automatically) — OCD is one mod, not a suite. A
+  failed hyprbars build no longer rewrites your setting; it warns and
+  retries instead. Removed the window-controls "text" style; solid colored
+  buttons are now the only option. `ocd enable`/`ocd disable` take no
+  arguments, and `--features=` / `ocd control-style` are gone.
 - **v1.2** — Added `ocd uninstall` (aliases: `remove`, `purge`) so
   uninstalling lives on the CLI alongside `apply`/`status`/`update`
   instead of only a standalone script. Added `ocd upgrade` as an alias
@@ -170,7 +202,9 @@ Global:
 - **Bash** — `bin/ocd` (the CLI) and `lib/*.sh` own every system mutation:
   installing, uninstalling, and reconciling actual system state to
   `~/.config/omarchy/ocd/features.json`, the single source of truth for
-  what's wanted.
+  whether OCD is wanted. That file records what *you* asked for, never what
+  happened to work on a given run — a failed hyprbars build warns and
+  retries, it never rewrites your setting.
 - **Lua** — `~/.config/hypr/ocd.lua` configures Hyprland itself (resize
   behavior, the minimize keybind, hyprbars styling/buttons, hotkeys) and is
   hooked into `hyprland.lua` with a single `require("ocd")` inside a marker

@@ -47,19 +47,17 @@ Usage: ocd <command> [args]
 
 Commands:
   apply                    Reconcile system state to ~/.config/omarchy/ocd/features.json
-  status                   Print the reconciled state of every feature
-  enable <feature>         Turn a feature on in features.json (does not apply)
-  disable <feature>        Turn a feature off in features.json (does not apply)
-  control-style [style]    Print the current titlebar button style, or set it
-                            (solid|text) in features.json (does not apply)
+  status                   Print the reconciled state
+  enable                   Turn ocd on in features.json (does not apply)
+  disable                  Turn ocd off in features.json (does not apply)
   update                   Check for and install the latest published release
                             (alias: upgrade)
   uninstall                Fully revert ocd (aliases: remove, purge)
   help                     Show this message
 
-Features: window-controls, mouse-management, dock, expose
-Control styles (window-controls sub-option): solid, text (shows D/H/H —
-Dock/Hoist/Halt — as minimize/maximize/close instead of icons)
+ocd is one mod with one switch: window controls, mouse management, the dock
+and Exposé all follow it together. Turning it off leaves the settings panel
+in place, so you can always turn it back on.
 
 Flags (apply):
   --dry-run             Print every mutation, change nothing
@@ -91,9 +89,8 @@ cmd_status() {
     else
         echo "installed:         unknown (no ${OCD_INSTALLED_REF_FILE#"$HOME"/} recorded)"
     fi
-    echo "ocd feature state (from $OCD_FEATURES_FILE):"
+    echo "ocd state (from $OCD_FEATURES_FILE):"
     ocd_features_print_status
-    printf '  %-18s %s\n' "control-style" "$(ocd_control_style_get)"
     echo
     if command -v hyprctl >/dev/null 2>&1 && hyprctl version >/dev/null 2>&1; then
         if ocd_hyprbars_is_enabled; then
@@ -111,26 +108,15 @@ cmd_status() {
 }
 
 cmd_enable() {
-    local feature="${1:?usage: ocd enable <feature>}"
-    ocd_feature_set "$feature" true
-    ocd_info "Set $feature = true in features.json. Run 'ocd apply' to reconcile the system."
+    [[ $# -eq 0 ]] || ocd_die "'ocd enable' takes no arguments — ocd is a single on/off switch as of schema v2 (was: enable <feature>)"
+    ocd_enabled_set true
+    ocd_info "Set enabled = true in features.json. Run 'ocd apply' to reconcile the system."
 }
 
 cmd_disable() {
-    local feature="${1:?usage: ocd disable <feature>}"
-    ocd_feature_set "$feature" false
-    ocd_info "Set $feature = false in features.json. Run 'ocd apply' to reconcile the system."
-}
-
-cmd_control_style() {
-    local style="${1:-}"
-    if [[ -z "$style" ]]; then
-        ocd_control_style_get
-        echo
-        return 0
-    fi
-    ocd_control_style_set "$style"
-    ocd_info "Set windowControlsStyle = $style in features.json. Run 'ocd apply' to reconcile the system."
+    [[ $# -eq 0 ]] || ocd_die "'ocd disable' takes no arguments — ocd is a single on/off switch as of schema v2 (was: disable <feature>)"
+    ocd_enabled_set false
+    ocd_info "Set enabled = false in features.json. Run 'ocd apply' to reconcile the system."
 }
 
 cmd_apply() {
@@ -145,38 +131,38 @@ cmd_apply() {
 
     ocd_features_init
 
-    local dock expose window_controls mouse_management
-    dock="$(ocd_feature_get dock)"
-    expose="$(ocd_feature_get expose)"
-    window_controls="$(ocd_feature_get window-controls)"
-    mouse_management="$(ocd_feature_get mouse-management)"
+    local enabled hyprbars_incomplete=0
+    enabled="$(ocd_enabled_get)"
 
-    if [[ "$window_controls" == "true" && "$dock" == "false" && "$expose" == "false" ]]; then
-        ocd_die "features.json requests window-controls with no restore surface (dock and expose are both false). Fix features.json or run: ocd enable dock (or expose)"
-    fi
-
-    # If a restore surface is about to end up disabled, sweep first no
-    # matter how the file got that way (hand-edit included).
-    [[ "$dock" == "false" || "$expose" == "false" ]] && ocd_sweep_minimized
+    # Turning ocd off removes both restore surfaces at once, so sweep
+    # special:minimized first — however the file got that way, hand-edit
+    # included — or those windows are stranded with no way back.
+    [[ "$enabled" == "false" ]] && ocd_sweep_minimized
 
     ocd_info "Reconciling shell.json plugin entries..."
-    ocd_shell_set_enabled "$OCD_ID_DOCK" "$dock"
-    ocd_shell_set_enabled "$OCD_ID_EXPOSE" "$expose"
-    # Settings isn't gated by a feature flag — it's the control surface
-    # itself, always wanted. A freshly-dropped-in manual plugin lands
-    # disabled by default until something explicitly enables it, so this
-    # must run unconditionally rather than only on install.
+    ocd_shell_set_enabled "$OCD_ID_DOCK" "$enabled"
+    ocd_shell_set_enabled "$OCD_ID_EXPOSE" "$enabled"
+    # Settings deliberately does NOT follow the switch — it's the control
+    # surface itself, and if turning ocd off took the panel with it there'd
+    # be no way to turn it back on short of hand-editing JSON. A
+    # freshly-dropped-in manual plugin also lands disabled by default until
+    # something explicitly enables it, so this must run unconditionally
+    # rather than only on install.
     ocd_shell_set_enabled "$OCD_ID_SETTINGS" true
 
-    if [[ "$window_controls" == "true" ]]; then
-        if ! ocd_hyprbars_enable; then
-            # Keep features.json truthful: it must never claim
-            # window-controls is on when hyprbars isn't actually loaded.
-            ocd_feature_set window-controls false
-            window_controls=false
-        fi
+    if [[ "$enabled" == "true" ]]; then
+        # A failed hyprbars build must never rewrite features.json. It's a
+        # transient, retryable condition (stale headers, or hyprpm locking
+        # itself out of its own root-owned state dir — see lib/hyprbars.sh),
+        # but the previous code recorded it by flipping the user's setting
+        # to false. That made a temporary failure permanent: the mod stayed
+        # off through every later apply, long after the real cause was
+        # fixed, and nothing ever told the user why. What the user wants and
+        # what currently works are two different facts; only the second one
+        # belongs in a warning.
+        ocd_hyprbars_enable || hyprbars_incomplete=1
     else
-        ocd_hyprbars_disable || true
+        ocd_hyprbars_disable || hyprbars_incomplete=1
     fi
 
     if command -v hyprctl >/dev/null 2>&1 && hyprctl version >/dev/null 2>&1; then
@@ -190,7 +176,7 @@ cmd_apply() {
         # after, even though hyprpm's own state still says enabled. hyprpm
         # itself re-attaches via its own `reload`, which doesn't re-parse
         # config (so it's cheap/safe to call every time, not just here).
-        if [[ "$window_controls" == "true" ]] && command -v hyprpm >/dev/null 2>&1; then
+        if [[ "$enabled" == "true" ]] && command -v hyprpm >/dev/null 2>&1; then
             ocd_run "re-attach hyprpm plugins after config reload" -- hyprpm reload -n
         fi
     fi
@@ -200,10 +186,21 @@ cmd_apply() {
         ocd_run "reload shell config" -- omarchy-shell shell reloadConfig || true
     fi
 
-    ocd_info "Apply complete. mouse-management=$mouse_management window-controls=$window_controls dock=$dock expose=$expose"
+    local state_word
+    state_word="$([[ "$enabled" == "true" ]] && echo on || echo off)"
+    ocd_info "Apply complete. ocd is $state_word."
 
     if [[ "$notify" == "1" ]] && command -v notify-send >/dev/null 2>&1 && ! ocd_dry_run; then
-        notify-send -a ocd "ocd" "Settings applied: window-controls=$window_controls, mouse-management=$mouse_management, dock=$dock, expose=$expose"
+        # The settings panel spawns us from Quickshell, which has no
+        # controlling terminal — so hyprpm's internal sudo can't prompt and
+        # the titlebar half of the toggle silently doesn't happen. Say so
+        # here, since a notification is the only channel the panel user has.
+        if [[ "$hyprbars_incomplete" == "1" ]]; then
+            notify-send -u critical -a ocd "ocd is now $state_word — window controls need a terminal" \
+                "Titlebars couldn't be changed: hyprpm needs a sudo password and there's no terminal to ask on. Run 'ocd apply' in a terminal to finish."
+        else
+            notify-send -a ocd "ocd" "ocd is now $state_word"
+        fi
     fi
 }
 
@@ -294,7 +291,6 @@ main() {
         status) cmd_status "$@" ;;
         enable) cmd_enable "$@" ;;
         disable) cmd_disable "$@" ;;
-        control-style) cmd_control_style "$@" ;;
         update|upgrade) cmd_update "$@" ;;
         uninstall|remove|purge) cmd_uninstall "$@" ;;
         help|-h|--help) ocd_usage ;;

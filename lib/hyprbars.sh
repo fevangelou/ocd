@@ -45,41 +45,38 @@ ocd_hyprpm_repo_present() {
 # re-checked and re-applied on every enable attempt instead.
 OCD_HYPRPM_STATE_DIR="/var/cache/hyprpm/$(id -un)"
 
-ocd_hyprpm_state_writable() {
-    [[ -d "$OCD_HYPRPM_STATE_DIR" && -w "$OCD_HYPRPM_STATE_DIR" ]]
-}
-
-ocd_hyprpm_fix_ownership() {
-    [[ -d "$OCD_HYPRPM_STATE_DIR" ]] || return 0
-    find "$OCD_HYPRPM_STATE_DIR" -not -writable -print -quit 2>/dev/null | grep -q . || return 0
-    ocd_warn "hyprpm's per-user state directory ($OCD_HYPRPM_STATE_DIR) has root-owned files again — hyprpm recreates them as root on every privileged build, not just the first ever time. Reclaiming ownership; this needs an interactive sudo prompt (same constraint as the state-store bootstrap above)."
-    if ocd_dry_run; then
-        printf '[dry-run] would run: sudo chown -R "%s:%s" %s\n' "$(id -un)" "$(id -gn)" "$OCD_HYPRPM_STATE_DIR" >&2
-        return 0
-    fi
-    ocd_run "reclaim hyprpm state dir ownership" -- sudo chown -R "$(id -un):$(id -gn)" "$OCD_HYPRPM_STATE_DIR" || true
-}
-
-# Every hyprpm invocation goes through here. The ownership repair has to
-# run *after* each command as well as before it: hyprpm's internal
-# privilege escalation creates the state dir and the built artifacts as
-# root during the very command being run, so repairing only up front is
-# useless for the command that comes next.
+# hyprpm mutates its state store through its OWN internal privilege
+# escalation, not as the invoking user. Confirmed live by intercepting the
+# call — every enable/disable/add ends in:
 #
-# This is the actual root cause of both reported failures. On a brand-new
-# machine /var/cache/hyprpm/<user>/ does not exist yet, so a leading
-# ownership check is a silent no-op; `hyprpm add` then creates the whole
-# tree as root; and the `hyprpm enable` immediately after it cannot write
-# state.toml — "[ERR] Failed to write plugin state", no plugin loaded.
-# After a Hyprland upgrade the same thing happens by a different route:
-# the privileged header rebuild re-roots a tree that used to be fine.
+#   sudo install -m644 -o 0 -g 0 /run/user/<uid>/hyprpm/.temp-state \
+#        /var/cache/hyprpm/<user>/<repo>/state.toml
+#
+# Note `-o 0 -g 0`: the store is *meant* to be root-owned, so chowning it
+# to the user (which ocd used to do) fixes nothing and merely fights
+# upstream — hyprpm re-roots it on the very next write.
+#
+# What actually matters is whether that internal sudo can obtain
+# credentials at all. sudo reads its password from /dev/tty, so a process
+# with no controlling terminal — `ocd apply` spawned by the Quickshell
+# settings panel, a curl|bash pipe, an agent run — can never satisfy it.
+# hyprpm then prints "[ERR] Failed to write plugin state" and, crucially,
+# still exits 0.
+ocd_hyprpm_can_escalate() {
+    sudo -n true 2>/dev/null && return 0      # NOPASSWD, or a cached timestamp
+    (exec 3<>/dev/tty) 2>/dev/null            # a terminal sudo could prompt on
+}
+
+ocd_hyprpm_escalation_hint() {
+    ocd_warn "hyprpm needs root to write its plugin state (it runs 'sudo install ... /var/cache/hyprpm/...' internally), and there's no terminal here for sudo to ask for a password on."
+    ocd_warn "Run 'ocd apply' yourself in a terminal to finish this step. Everything else ocd does has already been applied."
+}
+
+# Every hyprpm invocation goes through here, purely so the call is logged
+# and dry-run-aware in one place.
 ocd_hyprpm() {
     local desc="$1"; shift
-    ocd_hyprpm_fix_ownership
-    local rc=0
-    ocd_run "$desc" -- hyprpm "$@" || rc=$?
-    ocd_hyprpm_fix_ownership
-    return "$rc"
+    ocd_run "$desc" -- hyprpm "$@"
 }
 
 # hyprpm's very first invocation ever on a machine needs to create a
@@ -111,10 +108,16 @@ ocd_hyprbars_enable() {
     fi
     command -v hyprpm >/dev/null 2>&1 || ocd_die "hyprpm not found; it ships with the hyprland package"
 
-    ocd_hyprpm_fix_ownership
+    # Bail out before touching hyprpm at all if its internal sudo can't
+    # possibly succeed — otherwise it "succeeds" (exit 0) having written
+    # nothing, and the only symptom is that no titlebars appear.
+    if ! ocd_dry_run && ! ocd_hyprpm_can_escalate; then
+        ocd_hyprpm_escalation_hint
+        return 1
+    fi
 
     if ocd_hyprpm_needs_interactive_bootstrap; then
-        ocd_warn "hyprpm needs a one-time interactive sudo prompt to set up its plugin state store — this can only happen in a real terminal, not from this installer/apply run. Leaving window-controls disabled; every other ocd feature is unaffected. Fix: open a terminal and run 'hyprpm list' once (approve the password prompt it shows you), then re-run 'ocd apply'."
+        ocd_warn "hyprpm needs a one-time interactive sudo prompt to set up its plugin state store — this can only happen in a real terminal, not from this installer/apply run. Window controls are unavailable until then; everything else ocd does is unaffected. Fix: open a terminal and run 'hyprpm list' once (approve the password prompt it shows you), then re-run 'ocd apply'."
         return 1
     fi
 
@@ -166,18 +169,8 @@ ocd_hyprbars_enable() {
         return 0
     fi
 
-    # Distinguish the two failure modes rather than blaming the build for
-    # both — the ownership one is fixable in one command, and telling the
-    # user "build failed" when nothing failed to build sends them chasing
-    # a compiler problem that isn't there.
-    if ! ocd_hyprpm_state_writable; then
-        ocd_warn "hyprbars could not be enabled because hyprpm's state directory is root-owned and ocd could not reclaim it: $OCD_HYPRPM_STATE_DIR"
-        ocd_warn "hyprpm runs as you but re-creates that directory as root during its privileged builds, so it locks itself out. Fix it in a real terminal with:"
-        ocd_warn "    sudo chown -R $(id -un):$(id -gn) $OCD_HYPRPM_STATE_DIR && ocd apply"
-    else
-        ocd_warn "hyprbars still would not load after 'hyprpm update'. Check 'hyprpm list' and 'hyprctl plugin list' — if hyprpm reports the plugin as enabled but the compositor shows none loaded, 'hyprpm reload' in a terminal is worth one try."
-    fi
-    ocd_warn "Leaving window-controls disabled; every other ocd feature (mouse management, dock, Exposé) is unaffected and unchanged."
+    ocd_warn "hyprbars still would not load after 'hyprpm update'. Check 'hyprpm list' and 'hyprctl plugin list' — if hyprpm reports the plugin as enabled but the compositor shows none loaded, 'hyprpm reload' in a terminal is worth one try."
+    ocd_warn "Window controls are unavailable this run; mouse management, the dock and Exposé are unaffected, and your ocd setting is unchanged."
     return 1
 }
 
@@ -204,14 +197,23 @@ ocd_hyprbars_disable() {
         ocd_info "hyprbars already disabled"
         return 0
     fi
-    # Same root-owned-state-dir failure mode as enable (see
-    # ocd_hyprpm_fix_ownership above) can hit `hyprpm disable` too — it
-    # also writes state.toml. Must not be fatal to the whole `ocd apply`
-    # run: confirmed live, an unguarded failure here previously aborted
-    # apply outright, before shell.json/feature reconciliation even ran.
-    if ! ocd_hyprpm "hyprpm disable hyprbars" disable hyprbars; then
-        ocd_warn "hyprpm disable hyprbars failed. hyprbars may still be loaded; re-run 'ocd apply' to retry. Every other ocd feature is unaffected."
+    # `hyprpm disable` writes state.toml too, so it needs the same
+    # privilege escalation as enable and fails the same silent way without
+    # it. Must not be fatal to the whole `ocd apply` run: confirmed live,
+    # an unguarded failure here previously aborted apply outright, before
+    # shell.json reconciliation even ran.
+    if ! ocd_dry_run && ! ocd_hyprpm_can_escalate; then
+        ocd_hyprpm_escalation_hint
+        ocd_warn "Titlebars are still showing until then."
         return 1
     fi
+    ocd_hyprpm "hyprpm disable hyprbars" disable hyprbars || true
     ocd_hyprpm "hyprpm reload" reload -n || true
+
+    # Same reason as enable: hyprpm exits 0 on a failed state write, so the
+    # compositor is the only trustworthy source.
+    if ! ocd_dry_run && ocd_hyprbars_is_enabled; then
+        ocd_warn "hyprbars is still loaded after 'hyprpm disable'. Re-run 'ocd apply' in a terminal to retry; everything else ocd does is unaffected."
+        return 1
+    fi
 }

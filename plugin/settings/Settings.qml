@@ -47,16 +47,8 @@ Item {
   // it's almost certainly that same click's toggle IPC arriving a beat
   // later, not a deliberate fresh open.
   property real lastGrabCloseAt: 0
-  // { "window-controls": true, "mouse-management": true, "dock": true, "expose": true }
-  property var features: ({ "window-controls": true, "mouse-management": true, "dock": true, "expose": true })
-  // Window-controls sub-option: "solid" (icon glyphs) or "text" (D/H/H — a
-  // nod to DHH; see hypr/ocd.lua for the close/maximize/minimize mapping).
-  property string controlStyle: "solid"
-  // { name: <feature>, value: <bool> } while a destructive toggle awaits
-  // confirmation; null otherwise.
-  property var pendingConfirm: null
-
-  readonly property bool canWindowControls: features["dock"] === true || features["expose"] === true
+  // The single on/off switch for the whole mod (features.json schema v2).
+  property bool enabled: true
 
   function shQuote(s) {
     return "'" + String(s).replace(/'/g, "'\\''") + "'"
@@ -67,104 +59,47 @@ Item {
     // toggle IPC from the same click that closed us via the outside-click
     // focus grab, not a genuine new open request.
     if (Date.now() - root.lastGrabCloseAt < 300) return
-    readFeaturesProc.running = true
-    readControlStyleProc.running = true
-    pendingConfirm = null
+    readEnabledProc.running = true
     opened = true
   }
 
   function close() {
     opened = false
-    pendingConfirm = null
   }
 
+  // Reads either schema: a v1 file (four per-feature flags) counts as on
+  // unless every feature was off, matching ocd_features_migrate in
+  // lib/features.sh. The panel can be opened before `ocd apply` has had a
+  // chance to migrate the file.
   Process {
-    id: readFeaturesProc
-    command: ["jq", "-c", ".features", root.featuresPath]
-    stdout: StdioCollector {
-      onStreamFinished: {
-        try {
-          var parsed = JSON.parse(String(text || "").trim())
-          if (parsed && typeof parsed === "object") root.features = parsed
-        } catch (e) { /* keep previous/defaults */ }
-      }
-    }
-  }
-
-  Process {
-    id: readControlStyleProc
-    command: ["jq", "-r", ".windowControlsStyle // \"solid\"", root.featuresPath]
+    id: readEnabledProc
+    command: ["jq", "-r",
+      'if has("enabled") then (.enabled != false) ' +
+      'else (((.features // {}) | length) == 0 ' +
+      'or (((.features // {}) | to_entries | map(.value) | any))) end',
+      root.featuresPath]
     stdout: StdioCollector {
       onStreamFinished: {
         var v = String(text || "").trim()
-        root.controlStyle = (v === "text") ? "text" : "solid"
+        if (v === "true" || v === "false") root.enabled = (v === "true")
       }
     }
   }
 
-  function setControlStyle(value) {
-    if (value !== "solid" && value !== "text") return
-    root.controlStyle = value
+  function setEnabled(value) {
+    root.enabled = value
     var script =
       "set -e; f=" + shQuote(root.featuresPath) + "; " +
       "mkdir -p \"$(dirname \"$f\")\"; " +
-      "[ -f \"$f\" ] || printf '%s' '{\"schemaVersion\":1,\"features\":{}}' > \"$f\"; " +
-      "tmp=$(mktemp); jq --arg v " + shQuote(value) +
-      " '.windowControlsStyle=$v' \"$f\" > \"$tmp\" && mv \"$tmp\" \"$f\""
-    writeControlStyleProc.command = ["bash", "-c", script]
-    writeControlStyleProc.running = true
+      "[ -f \"$f\" ] || printf '%s' '{\"schemaVersion\":2}' > \"$f\"; " +
+      "tmp=$(mktemp); jq --argjson v " + (value ? "true" : "false") +
+      " '{schemaVersion: 2, enabled: $v}' \"$f\" > \"$tmp\" && mv \"$tmp\" \"$f\""
+    writeEnabledProc.command = ["bash", "-c", script]
+    writeEnabledProc.running = true
   }
 
   Process {
-    id: writeControlStyleProc
-    onExited: function (exitCode) {
-      if (exitCode === 0) root.applyDetached()
-    }
-  }
-
-  // requestSetFeature: the UI-facing entry point. Enforces the dependency
-  // graph (window-controls needs a restore surface) by warning-then-
-  // confirming rather than silently refusing, since the user might
-  // genuinely want both off at once.
-  function requestSetFeature(name, value) {
-    if (name === "window-controls" && value === true && !canWindowControls) return
-    if ((name === "dock" || name === "expose") && value === false && features["window-controls"] === true) {
-      var other = name === "dock" ? "expose" : "dock"
-      if (features[other] !== true) {
-        pendingConfirm = { name: name, value: value }
-        return
-      }
-    }
-    setFeature(name, value)
-  }
-
-  function confirmPending() {
-    if (!pendingConfirm) return
-    var p = pendingConfirm
-    pendingConfirm = null
-    setFeature(p.name, p.value)
-  }
-
-  function cancelPending() { pendingConfirm = null }
-
-  function setFeature(name, value) {
-    var next = {}
-    for (var k in root.features) next[k] = root.features[k]
-    next[name] = value
-    root.features = next
-
-    var script =
-      "set -e; f=" + shQuote(root.featuresPath) + "; " +
-      "mkdir -p \"$(dirname \"$f\")\"; " +
-      "[ -f \"$f\" ] || printf '%s' '{\"schemaVersion\":1,\"features\":{}}' > \"$f\"; " +
-      "tmp=$(mktemp); jq --arg k " + shQuote(name) + " --argjson v " + (value ? "true" : "false") +
-      " '.features[$k]=$v' \"$f\" > \"$tmp\" && mv \"$tmp\" \"$f\""
-    writeFeatureProc.command = ["bash", "-c", script]
-    writeFeatureProc.running = true
-  }
-
-  Process {
-    id: writeFeatureProc
+    id: writeEnabledProc
     onExited: function (exitCode) {
       if (exitCode === 0) root.applyDetached()
     }
@@ -202,20 +137,6 @@ Item {
       if (exitCode !== 0) { applyPollTimer.running = false; root.applying = false }
     }
   }
-
-  readonly property var featureOrder: ["window-controls", "mouse-management", "dock", "expose"]
-  readonly property var featureLabels: ({
-    "window-controls": "Window Controls",
-    "mouse-management": "Mouse Management",
-    "dock": "Dock",
-    "expose": "Exposé"
-  })
-  readonly property var featureDescriptions: ({
-    "window-controls": "Titlebars with minimize / maximize / close (hyprbars).",
-    "mouse-management": "Drag-to-move and drag-to-resize, including border resize.",
-    "dock": "Running windows and pinned apps in an auto-hiding dock.",
-    "expose": "Fullscreen live-preview window switcher (SUPER+E)."
-  })
 
   Variants {
     model: Quickshell.screens
@@ -297,218 +218,48 @@ Item {
             font.pixelSize: Style.font.title
           }
 
-          Repeater {
-            model: root.featureOrder
-            delegate: Column {
-              required property string modelData
-              width: content.width
-              spacing: 2
+          // One switch for the whole mod. The per-feature toggles this
+          // replaced produced combinations nobody wanted, and a failed
+          // hyprbars build used to silently flip window-controls off and
+          // leave it that way — see lib/features.sh for the schema change.
+          //
+          // Explicit heights throughout rather than relying on implicit
+          // auto-sizing: a positioner nested this deep (Column > Column)
+          // was confirmed live to report implicitHeight 0 indefinitely, so
+          // the popup's BorderSurface never allocated space for its rows.
+          Column {
+            width: content.width
+            spacing: Style.space(4)
 
-              readonly property bool isWindowControls: modelData === "window-controls"
-              readonly property bool rowEnabled: !isWindowControls || root.canWindowControls || root.features[modelData] === true
-
-              Row {
-                width: parent.width
-                spacing: Style.space(8)
-
-                Text {
-                  width: parent.width - toggle.width - Style.space(8)
-                  text: root.featureLabels[modelData]
-                  color: rowEnabled ? Color.foreground : Util.alpha(Color.foreground, 0.4)
-                  font.family: Style.font.family
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-
-                Switch {
-                  id: toggle
-                  anchors.verticalCenter: parent.verticalCenter
-                  enabled: rowEnabled
-                  checked: root.features[modelData] === true
-                  onToggled: root.requestSetFeature(modelData, checked)
-                }
-              }
+            Row {
+              width: parent.width
+              height: Style.space(24)
+              spacing: Style.space(8)
 
               Text {
-                width: parent.width
-                text: root.featureDescriptions[modelData]
-                color: Util.alpha(Color.foreground, 0.6)
-                font.family: Style.font.family
-                font.pixelSize: Math.max(9, Style.font.title - 4)
-                wrapMode: Text.WordWrap
-              }
-
-              Text {
-                visible: isWindowControls && !root.canWindowControls
-                width: parent.width
-                text: "Needs Dock or Exposé enabled as a restore surface for minimized windows."
-                color: Color.accent
-                font.family: Style.font.family
-                font.pixelSize: Math.max(9, Style.font.title - 4)
-                wrapMode: Text.WordWrap
-              }
-
-              // Window-controls sub-option: titlebar button style. Only
-              // shown/enabled while window-controls itself is on.
-              //
-              // Every item below has an EXPLICIT height rather than
-              // relying on Row/Column implicit auto-sizing — confirmed
-              // live (via temporary debug logging, since removed) that a
-              // plain `Row`/`Column` nested this deep (Column > Repeater >
-              // Column > Column) reported implicitHeight staying at 0
-              // indefinitely, so the enclosing Column's own implicitHeight
-              // never grew past its single Text label and the popup's
-              // BorderSurface (sized from that implicitHeight) never
-              // allocated space for these rows at all — not a rendering
-              // bug, a layout-sizing one. Explicit heights sidestep it.
-              //
-              // The two options are laid out on ONE line inside a plain
-              // Item (not a Row/Column positioner) with each child's `x`
-              // explicitly chained off the previous sibling's own x+width.
-              // This isn't just style: a `Row` positioner was confirmed
-              // live to also fail to POSITION its children correctly at
-              // this same nesting depth — giving the Row itself an
-              // explicit width/height (as the previous version did) fixed
-              // its own reported size but not the actual left-to-right
-              // placement of the circle and label inside it, which is why
-              // that version still rendered the two overlapping even after
-              // the sizing fix. Plain property bindings (`x: sibling.x +
-              // sibling.width + gap`) are evaluated by the ordinary QML
-              // binding engine, not the positioner's internal layout pass,
-              // and were confirmed reliable at this depth throughout this
-              // file already (e.g. the explicit height bindings above).
-              readonly property int controlTypeRowHeight: Style.space(18)
-
-              Column {
-                width: parent.width
-                height: visible ? (Style.space(18) + Style.space(4) + parent.controlTypeRowHeight) : 0
-                visible: isWindowControls
-                spacing: Style.space(4)
-                topPadding: Style.space(4)
-
-                Text {
-                  height: Style.space(18)
-                  text: "Control Type"
-                  color: root.features["window-controls"] === true ? Color.foreground : Util.alpha(Color.foreground, 0.4)
-                  font.family: Style.font.family
-                  font.pixelSize: Math.max(9, Style.font.title - 4)
-                  font.bold: true
-                }
-
-                Item {
-                  id: controlTypeOptions
-                  width: parent.width
-                  height: parent.parent.controlTypeRowHeight
-                  readonly property bool rowActive: root.features["window-controls"] === true
-                  readonly property int circleSize: Style.space(12)
-                  readonly property int labelGap: Style.space(6)
-                  readonly property int optionGap: Style.space(16)
-
-                  Rectangle {
-                    id: solidCircle
-                    x: 0
-                    y: (parent.height - height) / 2
-                    width: parent.circleSize
-                    height: parent.circleSize
-                    radius: width / 2
-                    color: root.controlStyle === "solid" ? Color.accent : "transparent"
-                    border.width: Math.max(1, Style.space(1))
-                    border.color: parent.rowActive ? Util.alpha(Color.foreground, 0.5) : Util.alpha(Color.foreground, 0.25)
-                  }
-
-                  Text {
-                    id: solidLabel
-                    x: solidCircle.x + solidCircle.width + parent.labelGap
-                    y: 0
-                    height: parent.height
-                    verticalAlignment: Text.AlignVCenter
-                    text: "Solid Colors"
-                    color: parent.rowActive ? Color.foreground : Util.alpha(Color.foreground, 0.4)
-                    font.family: Style.font.family
-                    font.pixelSize: Math.max(9, Style.font.title - 4)
-                    font.bold: root.controlStyle === "solid"
-                  }
-
-                  MouseArea {
-                    x: solidCircle.x
-                    y: 0
-                    width: solidLabel.x + solidLabel.contentWidth - solidCircle.x
-                    height: parent.height
-                    enabled: parent.rowActive
-                    onClicked: root.setControlStyle("solid")
-                  }
-
-                  Rectangle {
-                    id: textCircle
-                    x: solidLabel.x + solidLabel.contentWidth + parent.optionGap
-                    y: (parent.height - height) / 2
-                    width: parent.circleSize
-                    height: parent.circleSize
-                    radius: width / 2
-                    color: root.controlStyle === "text" ? Color.accent : "transparent"
-                    border.width: Math.max(1, Style.space(1))
-                    border.color: parent.rowActive ? Util.alpha(Color.foreground, 0.5) : Util.alpha(Color.foreground, 0.25)
-                  }
-
-                  Text {
-                    id: textLabel
-                    x: textCircle.x + textCircle.width + parent.labelGap
-                    y: 0
-                    height: parent.height
-                    verticalAlignment: Text.AlignVCenter
-                    text: "Text (Dock, Hoist, Halt)"
-                    color: parent.rowActive ? Color.foreground : Util.alpha(Color.foreground, 0.4)
-                    font.family: Style.font.family
-                    font.pixelSize: Math.max(9, Style.font.title - 4)
-                    font.bold: root.controlStyle === "text"
-                  }
-
-                  MouseArea {
-                    x: textCircle.x
-                    y: 0
-                    width: textLabel.x + textLabel.contentWidth - textCircle.x
-                    height: parent.height
-                    enabled: parent.rowActive
-                    onClicked: root.setControlStyle("text")
-                  }
-                }
-              }
-            }
-          }
-
-          Rectangle {
-            visible: root.pendingConfirm !== null
-            width: parent.width
-            height: confirmCol.implicitHeight + Style.space(12)
-            radius: Style.cornerRadius
-            color: Util.alpha(Color.accent, 0.12)
-
-            Column {
-              id: confirmCol
-              anchors.fill: parent
-              anchors.margins: Style.space(6)
-              spacing: Style.space(6)
-
-              Text {
-                width: parent.width
-                wrapMode: Text.WordWrap
+                width: parent.width - masterToggle.width - Style.space(8)
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
+                text: "Enabled"
                 color: Color.foreground
                 font.family: Style.font.family
-                text: "This turns off the last restore surface. Window controls (minimize) will also be turned off. Continue?"
               }
 
-              Row {
-                spacing: Style.space(8)
-                Button { text: "Cancel"; onClicked: root.cancelPending() }
-                Button {
-                  text: "Turn off"
-                  onClicked: {
-                    if (root.pendingConfirm) {
-                      root.confirmPending()
-                      root.setFeature("window-controls", false)
-                    }
-                  }
-                }
+              Switch {
+                id: masterToggle
+                anchors.verticalCenter: parent.verticalCenter
+                checked: root.enabled
+                onToggled: root.setEnabled(checked)
               }
+            }
+
+            Text {
+              width: parent.width
+              text: "Window controls, mouse management, the dock and Exposé. Turning this off leaves this settings panel in place."
+              color: Util.alpha(Color.foreground, 0.6)
+              font.family: Style.font.family
+              font.pixelSize: Math.max(9, Style.font.title - 4)
+              wrapMode: Text.WordWrap
             }
           }
 
