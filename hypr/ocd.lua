@@ -159,6 +159,21 @@ if hl.plugin and hl.plugin.hyprbars then
   })
 
   if enabled then
+    -- Double-click the bar (anywhere that isn't a button) to toggle
+    -- maximize, matching the middle button. `on_double_click` is a plain
+    -- shell command, same form as a button's `action` — hyprbars runs it
+    -- verbatim. Set in its own hl.config call rather than alongside the
+    -- styling above so it only applies while ocd is enabled: hl.config
+    -- assigns each leaf to one `section:key` variable, so a second call
+    -- touching one key leaves the rest alone.
+    hl.config({
+      plugin = {
+        hyprbars = {
+          on_double_click = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
+        },
+      },
+    })
+
     -- Solid colored buttons with no glyph — red/yellow/green for
     -- close/maximize/minimize. hyprbars' `icon` accepts plain text, so an
     -- empty string leaves the button as a bare colored circle.
