@@ -1,5 +1,5 @@
 // /**
-//  * @version   1.3
+//  * @version   1.4
 //  * @package   Omarchy Classic Desktop (OCD)
 //  * @author    Fotis Evangelou
 //  * @url       https://github.com/fevangelou/ocd

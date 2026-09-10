@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -25,10 +25,6 @@ OCD_SCHEMA_VERSION=2
 ocd_features_init() {
     if [[ ! -f "$OCD_FEATURES_FILE" ]]; then
         ocd_info "Creating default $OCD_FEATURES_FILE"
-        if ocd_dry_run; then
-            printf '[dry-run] would create default features.json at %s\n' "$OCD_FEATURES_FILE" >&2
-            return 0
-        fi
         mkdir -p "$OCD_CONFIG_DIR"
         cat >"$OCD_FEATURES_FILE" <<EOF
 {
@@ -62,8 +58,8 @@ ocd_features_migrate() {
 }
 
 # ocd_enabled_get -> prints "true" or "false".
-# Reads a v1 file correctly too, so a --dry-run (which writes nothing, and
-# so never migrates) still reports the right answer.
+# Reads a v1 file correctly too, so a caller that runs before
+# ocd_features_init has migrated the file still gets the right answer.
 ocd_enabled_get() {
     [[ -f "$OCD_FEATURES_FILE" ]] || { printf 'true'; return 0; }
     local val

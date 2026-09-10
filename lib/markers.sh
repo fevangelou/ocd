@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -24,11 +24,6 @@ ocd_marker_append() {
         ocd_log "INFO" "marker '$tag' already present in $file, skipping"
         return 0
     fi
-    if ocd_dry_run; then
-        printf '[dry-run] would append marker block "%s" to %s\n' "$tag" "$file" >&2
-        ocd_log "DRY-RUN" "append marker '$tag' to $file"
-        return 0
-    fi
     [[ -f "$file" ]] || : >"$file"
     {
         printf '\n%s >>> %s >>>\n' "$prefix" "$tag"
@@ -43,11 +38,6 @@ ocd_marker_remove() {
     local file="$1" tag="$2"
     [[ -f "$file" ]] || return 0
     ocd_marker_present "$file" "$tag" || return 0
-    if ocd_dry_run; then
-        printf '[dry-run] would remove marker block "%s" from %s\n' "$tag" "$file" >&2
-        ocd_log "DRY-RUN" "remove marker '$tag' from $file"
-        return 0
-    fi
     local tmp
     tmp="$(mktemp "${file}.XXXXXX")"
     # Also drops the single blank separator line ocd_marker_append put

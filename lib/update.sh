@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -39,10 +39,6 @@ ocd_record_installed_ref() {
     sha="$(git -C "$repo_dir" rev-parse HEAD 2>/dev/null || true)"
     [[ -n "$sha" ]] || return 0
     tag="$(ocd_tag_for_sha "$sha")"
-    if ocd_dry_run; then
-        printf '[dry-run] would record installed ref (sha=%s tag=%s) at %s\n' "$sha" "${tag:-none}" "$OCD_INSTALLED_REF_FILE" >&2
-        return 0
-    fi
     mkdir -p "$OCD_INSTALL_DIR"
     printf 'sha=%s\ntag=%s\n' "$sha" "$tag" >"$OCD_INSTALLED_REF_FILE"
 }

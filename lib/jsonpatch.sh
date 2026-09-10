@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -19,8 +19,7 @@ ocd_require_jq() {
 # ocd_json_patch <file> <jq-filter> [extra jq args...]
 # Reads file (treats missing file as '{}'), applies filter, validates the
 # result parses, writes atomically. Leaves unrelated keys byte-identical
-# aside from jq's own formatting. Under --dry-run, prints a diff and writes
-# nothing.
+# aside from jq's own formatting.
 ocd_json_patch() {
     local file="$1" filter="$2"; shift 2
     ocd_require_jq
@@ -31,14 +30,6 @@ ocd_json_patch() {
         ocd_die "jq filter failed for $file: $filter"
     fi
     printf '%s' "$output" | jq -e . >/dev/null 2>&1 || ocd_die "jq produced invalid JSON for $file, aborting without writing"
-    if ocd_dry_run; then
-        printf '[dry-run] would patch %s with filter: %s\n' "$file" "$filter" >&2
-        if command -v diff >/dev/null 2>&1; then
-            diff -u <(printf '%s' "$input" | jq -S . 2>/dev/null) <(printf '%s' "$output" | jq -S .) || true
-        fi
-        ocd_log "DRY-RUN" "patch $file :: $filter"
-        return 0
-    fi
     mkdir -p "$(dirname "$file")"
     local tmp
     tmp="$(mktemp "${file}.XXXXXX")"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -49,10 +49,8 @@ FORCE=0
 
 ocd_install_usage() {
     cat <<'EOF'
-Usage: install.sh [--dry-run] [--force] [--help]
+Usage: install.sh [--force] [--help]
 
-  --dry-run          Print every mutation this installer would make, change nothing.
-                      Recommended as your first run.
   --force             Proceed even if a conflicting community dock/Exposé plugin
                       is detected in shell.json.
   --help              Show this message.
@@ -65,7 +63,6 @@ EOF
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --dry-run) DRY_RUN=1; shift ;;
             --force) FORCE=1; shift ;;
             --help|-h) ocd_install_usage; exit 0 ;;
             *) ocd_die "unknown flag: $1 (see --help)" ;;
@@ -93,10 +90,6 @@ check_sudo_for_missing_packages() {
     [[ ${#missing[@]} -eq 0 ]] && return 0
 
     ocd_info "Missing required package(s): ${missing[*]}. ocd needs sudo once, up front, to install them via pacman — nothing else in this installer runs as root."
-    if ocd_dry_run; then
-        printf '[dry-run] would run: sudo pacman -S --needed --noconfirm %s\n' "${missing[*]}" >&2
-        return 0
-    fi
     # --noconfirm: under `curl | bash`, stdin is the already-drained pipe, not
     # a terminal — pacman's own "Proceed with installation? [Y/n]" prompt
     # gets immediate EOF and aborts the whole installer right here (confirmed
@@ -160,19 +153,15 @@ install_files() {
         chmod +x "$1/bin/ocd" "$1/uninstall.sh"
     ' _ "$OCD_INSTALL_DIR" "$REPO_DIR"
 
-    if ocd_dry_run; then
-        printf '[dry-run] would symlink %s/.local/bin/ocd -> %s/bin/ocd\n' "$HOME" "$OCD_INSTALL_DIR" >&2
-    else
-        mkdir -p "$HOME/.local/bin"
-        ln -sf "$OCD_INSTALL_DIR/bin/ocd" "$HOME/.local/bin/ocd"
-        ocd_log "RUN" "symlinked ~/.local/bin/ocd -> $OCD_INSTALL_DIR/bin/ocd"
-        case ":$PATH:" in
-            *":$HOME/.local/bin:"*) ;;
-            *) ocd_warn "$HOME/.local/bin is not on your PATH — run ocd as $HOME/.local/bin/ocd, or add it to PATH" ;;
-        esac
-    fi
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$OCD_INSTALL_DIR/bin/ocd" "$HOME/.local/bin/ocd"
+    ocd_log "RUN" "symlinked ~/.local/bin/ocd -> $OCD_INSTALL_DIR/bin/ocd"
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *) ocd_warn "$HOME/.local/bin is not on your PATH — run ocd as $HOME/.local/bin/ocd, or add it to PATH" ;;
+    esac
 
-    [[ -d "$HYPR_CONFIG_DIR" ]] || ocd_dry_run || mkdir -p "$HYPR_CONFIG_DIR"
+    [[ -d "$HYPR_CONFIG_DIR" ]] || mkdir -p "$HYPR_CONFIG_DIR"
     ocd_run "install ocd.lua" -- cp "$REPO_DIR/hypr/ocd.lua" "$HYPR_OCD_LUA"
     ocd_marker_append "$HYPR_MAIN_LUA" "$HYPR_OCD_MARKER" 'require("ocd")'
 
@@ -186,7 +175,6 @@ main() {
     parse_args "$@"
     ocd_log_init
     ocd_info "ocd installer starting (log: $OCD_LOG_FILE)"
-    ocd_dry_run && ocd_info "--dry-run: no changes will be made"
 
     run_preflight
 
@@ -195,12 +183,7 @@ main() {
     write_initial_features_file
 
     ocd_info "Reconciling system state via 'ocd apply'..."
-    local apply_args=() ocd_bin="$OCD_INSTALL_DIR/bin/ocd"
-    if ocd_dry_run; then
-        apply_args+=(--dry-run)
-        ocd_bin="$REPO_DIR/bin/ocd"   # nothing was actually copied to OCD_INSTALL_DIR
-    fi
-    "$ocd_bin" apply "${apply_args[@]}"
+    "$OCD_INSTALL_DIR/bin/ocd" apply
 
     ocd_info "Install complete."
     ocd_info "Run 'ocd status' any time to see the reconciled state."

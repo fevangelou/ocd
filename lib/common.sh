@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -8,7 +8,7 @@
 #  * @license   GNU/GPL license: https://www.gnu.org/copyleft/gpl.html
 #  */
 
-# ocd shared paths, constants, and the dry-run-aware command runner.
+# ocd shared paths, constants, and the logging command runner.
 # Sourced by every entry point; never executed directly.
 
 OCD_PLUGIN_ID="io.github.fevangelou.ocd"
@@ -36,10 +36,6 @@ HYPR_OCD_MARKER="ocd"
 # ~/.config/omarchy/plugins/<id>/, one directory per plugin id.
 OCD_PLUGINS_ROOT="${OCD_PLUGINS_ROOT:-$HOME/.config/omarchy/plugins}"
 
-DRY_RUN="${DRY_RUN:-0}"
-
-ocd_dry_run() { [[ "$DRY_RUN" == "1" ]]; }
-
 ocd_quote_cmd() {
     local out="" a
     for a in "$@"; do
@@ -49,15 +45,10 @@ ocd_quote_cmd() {
 }
 
 # ocd_run <description> -- <command...>
-# Executes and logs a mutating command; under --dry-run, only prints+logs it.
+# Executes and logs a mutating command.
 ocd_run() {
     local desc="$1"; shift
     [[ "${1:-}" == "--" ]] && shift
-    if ocd_dry_run; then
-        printf '[dry-run] %s\n         $ %s\n' "$desc" "$(ocd_quote_cmd "$@")" >&2
-        ocd_log "DRY-RUN" "$desc :: $(ocd_quote_cmd "$@")"
-        return 0
-    fi
     ocd_log "RUN" "$desc :: $(ocd_quote_cmd "$@")"
     "$@"
 }

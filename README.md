@@ -47,14 +47,6 @@ https://github.com/user-attachments/assets/a3131b9f-ffcc-44e9-bb4f-3404a54251d9
 
 ## Installation
 
-Recommended — preview first, no changes made:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/fevangelou/ocd/main/boot.sh | bash -s -- --dry-run
-```
-
-Happy with the plan? Drop the flag to actually install:
-
 ```sh
 curl -fsSL https://raw.githubusercontent.com/fevangelou/ocd/main/boot.sh | bash
 ```
@@ -64,15 +56,13 @@ Or, from a git clone:
 ```sh
 git clone https://github.com/fevangelou/ocd.git
 cd ocd
-./install.sh --dry-run   # preview
-./install.sh              # install
+./install.sh
 ```
 
 Both entry points take the same flags:
 
 | Flag | Effect |
 |---|---|
-| `--dry-run` | Print every mutation, change nothing. |
 | `--force` | Proceed even if a conflicting community dock/Exposé plugin is detected. |
 
 OCD is one mod with one switch. Turn it off later from the settings panel
@@ -84,7 +74,7 @@ Requires a live Omarchy 4.x session — the installer checks this itself and
 refuses to run on anything else.
 
 `boot.sh` never follows the `main` branch — it's pinned to the exact commit
-tagged for the current release (`v1.3` right now), fetched by that commit's
+tagged for the current release (`v1.4` right now), fetched by that commit's
 SHA and verified before anything runs. `main` can move ahead with
 in-progress work without changing what `curl | bash` installs; only cutting
 a new release tag does that.
@@ -99,8 +89,8 @@ Checks the repository for the latest published release tag, and if it's
 newer than what's installed, fetches and re-runs the installer from that
 exact pinned commit — same trust model as the initial install, never `main`.
 Your on/off setting in `features.json` is left exactly as it is. Flags:
-`--dry-run`, `--yes` (skip the confirmation prompt). `ocd status` shows the
-currently installed tag/commit.
+`--yes` (skip the confirmation prompt). `ocd status` shows the currently
+installed tag/commit.
 
 `ocd update --main` fetches whatever `main` currently points to instead of
 the latest release — for development use only, not a reviewed/pinned
@@ -116,8 +106,8 @@ ocd uninstall
 reverts every change ocd made — strips the Hyprland config hook, disables
 hyprbars if ocd was the one that enabled it, removes all three Quickshell
 plugins, and cleans up `~/.local/share/ocd`. Safe to run even after a
-partially-failed install. Flags: `--dry-run`, `--yes` (skip the prompt
-before deleting your `features.json`/pins/overrides).
+partially-failed install. Flags: `--yes` (skip the prompt before deleting
+your `features.json`/pins/overrides).
 
 If `ocd` itself isn't on your PATH, run the underlying script directly:
 
@@ -154,15 +144,19 @@ window first (SUPER+T) if you want freeform drag.
   (`─ □ ×`) on hover** and stay bare colored circles at rest; hyprbars has
   no text tooltips, and this is its supported equivalent — note that
   hovering any one button reveals all three, which is how hyprbars scopes
-  it. The buttons are also **larger and further apart** (18px across, 30px
-  centre to centre). The dock now **hides itself when it has nothing to
-  show**, instead of sitting at the bottom of the screen as an empty strip
-  that still reserves space; it reappears the moment a window opens, and
-  pinned apps count as something to show, so a dock with pins stays put.
-  Moved the **Exposé hot corner to the bottom-right** (was top-right).
-  `ocd status` no longer dumps the raw `listPlugins` JSON for every plugin
-  on the system — it prints just OCD's own plugins and their state, with
-  `--full` for the raw dump when debugging.
+  it. The buttons are also **larger and further apart** (16px across, 28px
+  centre to centre, in a 28px bar). The dock now **hides itself when it has
+  nothing to show**, instead of sitting at the bottom of the screen as an
+  empty strip that still reserves space; it reappears the moment a window
+  opens, and pinned apps count as something to show, so a dock with pins
+  stays put. Moved the **Exposé hot corner to the bottom-right** (was
+  top-right). `ocd status` no longer dumps the raw `listPlugins` JSON for
+  every plugin on the system — it prints just OCD's own plugins and their
+  state, with `--full` for the raw dump when debugging. **Removed
+  `--dry-run` everywhere** — from the installer, `ocd apply`, `ocd update`
+  and `ocd uninstall`, along with the internal plumbing behind it. Previewing
+  every mutation was a lot of machinery for a mod this small, and it's gone
+  in favour of doing one obvious thing.
 - **v1.3** — Fixed window controls failing to load, both on a fresh install
   and after upgrading to Omarchy 4.0.3. Stale plugin headers block
   `hyprpm add`, and without the repo cloned `hyprpm enable` can only ever
@@ -206,7 +200,6 @@ For the Exposé:
 - Provide text assistance like 'Close with the "Esc" key'
 
 For the Window Controls:
-- Real text tooltips on each control (hyprbars has no tooltip support — the controls currently reveal their glyphs on hover instead)
 - Consider 4th control for allowing the window to float
 
 Global:

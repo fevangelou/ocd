@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -34,11 +34,6 @@ ocd_plugin_install_dir() {
     local id="$1" src="$2" dest
     dest="$(ocd_plugin_dir "$id")"
     [[ -d "$src" ]] || ocd_die "plugin source missing: $src"
-    if ocd_dry_run; then
-        printf '[dry-run] would install plugin %s: %s -> %s\n' "$id" "$src" "$dest" >&2
-        ocd_log "DRY-RUN" "install plugin $id :: $src -> $dest"
-        return 0
-    fi
     mkdir -p "$dest"
     cp -rT "$src" "$dest"
     ocd_log "RUN" "installed plugin $id from $src to $dest"

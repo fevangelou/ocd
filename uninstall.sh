@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -35,9 +35,8 @@ ASSUME_YES=0
 
 ocd_uninstall_usage() {
     cat <<'EOF'
-Usage: uninstall.sh [--dry-run] [--yes] [--help]
+Usage: uninstall.sh [--yes] [--help]
 
-  --dry-run                  Print every mutation, change nothing.
   --yes                      Don't prompt before deleting features.json and
                               the app-ID override map (your data).
   --help                     Show this message.
@@ -47,7 +46,6 @@ EOF
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --dry-run) DRY_RUN=1; shift ;;
             --yes) ASSUME_YES=1; shift ;;
             --help|-h) ocd_uninstall_usage; exit 0 ;;
             *) ocd_die "unknown flag: $1 (see --help)" ;;
@@ -78,7 +76,6 @@ main() {
     parse_args "$@"
     ocd_log_init
     ocd_info "ocd uninstaller starting (log: $OCD_LOG_FILE)"
-    ocd_dry_run && ocd_info "--dry-run: no changes will be made"
 
     # Always first, unconditionally, even on a partially-failed install:
     # never leave a window stranded with no way back.

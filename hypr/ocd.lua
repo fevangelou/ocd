@@ -1,5 +1,5 @@
 -- /**
---  * @version   1.3
+--  * @version   1.4
 --  * @package   Omarchy Classic Desktop (OCD)
 --  * @author    Fotis Evangelou
 --  * @url       https://github.com/fevangelou/ocd
@@ -143,7 +143,7 @@ if hl.plugin and hl.plugin.hyprbars then
   hl.config({
     plugin = {
       hyprbars = {
-        bar_height = 30,
+        bar_height = 28,
         bar_color = "rgba(1e1e2eee)",
         bar_title_enabled = true,
         bar_text_size = 11,
@@ -198,14 +198,14 @@ if hl.plugin and hl.plugin.hyprbars then
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(f38ba8ff)",
       fg_color = "rgba(1e1e2eff)",
-      size = 18,
+      size = 16,
       icon = "×",
       action = "hyprctl dispatch 'hl.dsp.window.close()'",
     })
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(f9e2afff)",
       fg_color = "rgba(1e1e2eff)",
-      size = 18,
+      size = 16,
       icon = "□",
       action = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
     })
@@ -215,7 +215,7 @@ if hl.plugin and hl.plugin.hyprbars then
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(a6e3a1ff)",
       fg_color = "rgba(1e1e2eff)",
-      size = 18,
+      size = 16,
       icon = "─",
       action = [[hyprctl dispatch 'hl.dsp.window.move({ workspace = "special:minimized", follow = false })']],
     })

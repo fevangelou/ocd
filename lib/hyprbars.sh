@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -70,7 +70,7 @@ ocd_hyprpm_escalation_hint() {
 }
 
 # Every hyprpm invocation goes through here, purely so the call is logged
-# and dry-run-aware in one place.
+# in one place.
 ocd_hyprpm() {
     local desc="$1"; shift
     ocd_run "$desc" -- hyprpm "$@"
@@ -108,7 +108,7 @@ ocd_hyprbars_enable() {
     # Bail out before touching hyprpm at all if its internal sudo can't
     # possibly succeed — otherwise it "succeeds" (exit 0) having written
     # nothing, and the only symptom is that no titlebars appear.
-    if ! ocd_dry_run && ! ocd_hyprpm_can_escalate; then
+    if ! ocd_hyprpm_can_escalate; then
         ocd_hyprpm_escalation_hint
         return 1
     fi
@@ -130,13 +130,13 @@ ocd_hyprbars_enable() {
     # please run hyprpm update") on a state dir that was just created — so
     # do what hyprpm's own message asks, then add again, before going near
     # enable.
-    if ! ocd_dry_run && ! ocd_hyprpm_repo_present; then
+    if ! ocd_hyprpm_repo_present; then
         ocd_warn "hyprpm has no hyprland-plugins repo after 'add' — usually outdated plugin headers. Running 'hyprpm update' to rebuild them, then retrying the add."
         ocd_hyprpm "hyprpm update" update || true
         ocd_hyprpm "hyprpm add hyprland-plugins (retry)" add "$OCD_HYPRLAND_PLUGINS_REPO" || true
     fi
 
-    if [[ "$repo_was_present" == "0" ]] && ! ocd_dry_run; then
+    if [[ "$repo_was_present" == "0" ]]; then
         mkdir -p "$OCD_STATE_DIR"
         : >"$OCD_HYPRPM_REPO_OWNED_MARKER"
     fi
@@ -147,11 +147,9 @@ ocd_hyprbars_enable() {
 
     # Deliberately not trusting hyprpm's exit code — see
     # ocd_hyprbars_is_enabled. Ask the compositor what it actually loaded.
-    if ocd_dry_run || ocd_hyprbars_is_enabled; then
-        if ! ocd_dry_run; then
-            mkdir -p "$OCD_STATE_DIR"
-            : >"$OCD_HYPRBARS_OWNED_MARKER"
-        fi
+    if ocd_hyprbars_is_enabled; then
+        mkdir -p "$OCD_STATE_DIR"
+        : >"$OCD_HYPRBARS_OWNED_MARKER"
         return 0
     fi
 
@@ -199,7 +197,7 @@ ocd_hyprbars_disable() {
     # it. Must not be fatal to the whole `ocd apply` run: confirmed live,
     # an unguarded failure here previously aborted apply outright, before
     # shell.json reconciliation even ran.
-    if ! ocd_dry_run && ! ocd_hyprpm_can_escalate; then
+    if ! ocd_hyprpm_can_escalate; then
         ocd_hyprpm_escalation_hint
         ocd_warn "Titlebars are still showing until then."
         return 1
@@ -209,7 +207,7 @@ ocd_hyprbars_disable() {
 
     # Same reason as enable: hyprpm exits 0 on a failed state write, so the
     # compositor is the only trustworthy source.
-    if ! ocd_dry_run && ocd_hyprbars_is_enabled; then
+    if ocd_hyprbars_is_enabled; then
         ocd_warn "hyprbars is still loaded after 'hyprpm disable'. Re-run 'ocd apply' in a terminal to retry; everything else ocd does is unaffected."
         return 1
     fi

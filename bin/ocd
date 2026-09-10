@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.3
+#  * @version   1.4
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -60,7 +60,6 @@ and Exposé all follow it together. Turning it off leaves the settings panel
 in place, so you can always turn it back on.
 
 Flags (apply):
-  --dry-run             Print every mutation, change nothing
   --notify              Send a desktop notification when apply finishes
                          (used by the settings panel; optional for CLI use)
 
@@ -69,13 +68,11 @@ Flags (status):
                          JSON for every plugin on the system, not just ocd's
 
 Flags (update):
-  --dry-run             Show what would be fetched/installed, change nothing
   --yes                 Don't prompt for confirmation before updating
   --main                Fetch the current tip of 'main' instead of the
                          latest published release (development use only)
 
 Flags (uninstall):
-  --dry-run             Print every mutation, change nothing
   --yes                 Don't prompt before deleting features.json and
                          the app-ID override map (your data)
 
@@ -164,7 +161,6 @@ cmd_apply() {
     local notify=0
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --dry-run) DRY_RUN=1; shift ;;
             --notify) notify=1; shift ;;
             *) ocd_die "unknown flag to 'ocd apply': $1" ;;
         esac
@@ -231,7 +227,7 @@ cmd_apply() {
     state_word="$([[ "$enabled" == "true" ]] && echo on || echo off)"
     ocd_info "Apply complete. ocd is $state_word."
 
-    if [[ "$notify" == "1" ]] && command -v notify-send >/dev/null 2>&1 && ! ocd_dry_run; then
+    if [[ "$notify" == "1" ]] && command -v notify-send >/dev/null 2>&1; then
         # The settings panel spawns us from Quickshell, which has no
         # controlling terminal — so hyprpm's internal sudo can't prompt and
         # the titlebar half of the toggle silently doesn't happen. Say so
@@ -246,10 +242,9 @@ cmd_apply() {
 }
 
 cmd_update() {
-    local dry=0 yes=0 use_main=0
+    local yes=0 use_main=0
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --dry-run) dry=1; DRY_RUN=1 ;;
             --yes) yes=1 ;;
             --main) use_main=1 ;;
             *) ocd_die "unknown flag to 'ocd update': $1" ;;
@@ -286,7 +281,7 @@ cmd_update() {
         ocd_info "Update available: $target_label ($target_sha) — no installed version on record"
     fi
 
-    if [[ "$yes" != "1" && "$dry" != "1" ]]; then
+    if [[ "$yes" != "1" ]]; then
         local reply
         read -r -p "Update ocd to $target_label now? [y/N] " reply || reply="n"
         [[ "$reply" =~ ^[Yy]$ ]] || { ocd_info "Update cancelled."; return 0; }
@@ -309,9 +304,7 @@ cmd_update() {
     chmod +x "$clone_dir/install.sh"
 
     ocd_info "Re-running the installer from $target_label — your on/off setting is preserved..."
-    local install_args=()
-    [[ "$dry" == "1" ]] && install_args+=(--dry-run)
-    "$clone_dir/install.sh" "${install_args[@]}"
+    "$clone_dir/install.sh"
 
     rm -rf "$clone_dir"
     trap - EXIT
