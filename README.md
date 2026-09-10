@@ -26,9 +26,10 @@ Embrace Minimize, Maximize or Close in Omarchy - or as I'd like to call it: Dock
   buttons (via [hyprbars](https://github.com/hyprwm/hyprland-plugins/tree/main/hyprbars))
 - **Mouse window management** — resize from a window's own border with no
   modifier key held (Omarchy already ships SUPER+drag to move/resize)
-- **Dock** — running windows plus your pinned apps, auto-hiding at the
-  bottom edge
-- **Exposé** — every open window as a live preview, type-to-search, SUPER+E
+- **Dock** — running windows plus your pinned apps, along the bottom edge;
+  always on while there's something in it, and hidden when there isn't
+- **Exposé** — every open window as a live preview, type-to-search. Opens
+  with SUPER+E or by throwing the pointer into the bottom-right corner
 - **Settings panel** — a bar icon and popup to turn OCD on or off, live, no
   config file editing required
 
@@ -147,18 +148,29 @@ window first (SUPER+T) if you want freeform drag.
 
 ## Changelog
 
+- **v1.4** — The dock now hides itself when it has nothing to show, instead
+  of sitting at the bottom of the screen as an empty strip that still
+  reserves space; it reappears the moment a window opens. Pinned apps still
+  count as something to show, so a dock with pins stays put. Moved the
+  Exposé hot corner from the top-right to the **bottom-right**. `ocd status`
+  no longer dumps the raw `listPlugins` JSON for every plugin on the system
+  — it prints just OCD's own plugins and their state, with `--full` for the
+  raw dump when debugging.
 - **v1.3** — Fixed window controls failing to load, both on a fresh install
-  and after upgrading to Omarchy 4.0.3: hyprpm re-creates its own
-  `/var/cache/hyprpm/<user>/` as root during a privileged build and then
-  can't write to it, so ocd now repairs ownership around *every* hyprpm
-  call and verifies against `hyprctl plugin list` rather than trusting an
-  exit code. Fixed `curl | bash` aborting at the dependency step. Collapsed
-  the four per-feature toggles into **one on/off switch** (`features.json`
-  schema v2, migrated automatically) — OCD is one mod, not a suite. A
-  failed hyprbars build no longer rewrites your setting; it warns and
-  retries instead. Removed the window-controls "text" style; solid colored
-  buttons are now the only option. `ocd enable`/`ocd disable` take no
-  arguments, and `--features=` / `ocd control-style` are gone.
+  and after upgrading to Omarchy 4.0.3. Stale plugin headers block
+  `hyprpm add`, and without the repo cloned `hyprpm enable` can only ever
+  report the plugin as missing — so OCD now runs `hyprpm update` and
+  retries the add, then verifies against `hyprctl plugin list` rather than
+  trusting hyprpm's exit code, which is `0` even when its own state write
+  failed. It also detects up front when hyprpm's internal `sudo` can't
+  obtain credentials, instead of half-succeeding silently. Fixed
+  `curl | bash` aborting at the dependency step. Collapsed the four
+  per-feature toggles into **one on/off switch** (`features.json` schema
+  v2, migrated automatically) — OCD is one mod, not a suite. A failed
+  hyprbars build no longer rewrites your setting; it warns and retries
+  instead. Removed the window-controls "text" style; solid colored buttons
+  are now the only option. `ocd enable`/`ocd disable` take no arguments,
+  and `--features=` / `ocd control-style` are gone.
 - **v1.2** — Added `ocd uninstall` (aliases: `remove`, `purge`) so
   uninstalling lives on the CLI alongside `apply`/`status`/`update`
   instead of only a standalone script. Added `ocd upgrade` as an alias
@@ -175,7 +187,6 @@ window first (SUPER+T) if you want freeform drag.
   
 ## To Do
 For the Dock:
-- Resolve auto-hiding not working when all windows are closed
 - Add 2 icons to reveal the Omarchy menu and the desktop
 - Use a colored dot instead of (min) for minimized apps
 - Explore a second more compact dock design option (e.g. with icons) as in Ubuntu Desktop, Gnome, macOS etc. The minimal Omarchy-like option will remain default.
@@ -185,8 +196,7 @@ For the Popup:
 - Switch to the font used in other navbar popups (so things look more "native")
 
 For the Exposé:
-- Provide text assistance like 'Close with "Esc" key or hover your mouse on the top/right corner'
-- Add option to choose the corner that triggers Exposé on your desktop
+- Provide text assistance like 'Close with the "Esc" key'
 
 For the Window Controls:
 - Tooltip when hovering on each control
