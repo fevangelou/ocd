@@ -14,9 +14,9 @@
 -- inside an ocd marker block. This file is self-contained: it never edits
 -- any file Omarchy owns, and everything it does is easy to grep back out.
 --
--- Feature flags live in ~/.config/omarchy/ocd/features.json and are read
--- fresh every time Hyprland (re)loads this file, so `ocd apply` never needs
--- to rewrite this file — it only needs to trigger a reload.
+-- The on/off switch lives in ~/.config/omarchy/ocd/features.json and is
+-- read fresh every time Hyprland (re)loads this file, so `ocd apply` never
+-- needs to rewrite this file — it only needs to trigger a reload.
 
 local FEATURES_FILE = os.getenv("HOME") .. "/.config/omarchy/ocd/features.json"
 

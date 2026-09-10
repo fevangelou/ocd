@@ -66,7 +66,7 @@ maybe_remove_user_data() {
         return 0
     fi
     local reply
-    read -r -p "Remove $OCD_CONFIG_DIR (your feature toggles and app-ID overrides)? [y/N] " reply || reply="n"
+    read -r -p "Remove $OCD_CONFIG_DIR (your on/off setting and app-ID overrides)? [y/N] " reply || reply="n"
     if [[ "$reply" =~ ^[Yy]$ ]]; then
         ocd_run "remove $OCD_CONFIG_DIR" -- rm -rf "$OCD_CONFIG_DIR"
     else

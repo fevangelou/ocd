@@ -267,7 +267,7 @@ cmd_update() {
     [[ -f "$clone_dir/install.sh" ]] || ocd_die "install.sh missing from $target_label"
     chmod +x "$clone_dir/install.sh"
 
-    ocd_info "Re-running the installer from $target_label — existing feature toggles are preserved..."
+    ocd_info "Re-running the installer from $target_label — your on/off setting is preserved..."
     local install_args=()
     [[ "$dry" == "1" ]] && install_args+=(--dry-run)
     "$clone_dir/install.sh" "${install_args[@]}"
