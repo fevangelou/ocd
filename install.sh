@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.2
+#  * @version   1.3
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -11,7 +11,7 @@
 # ocd installer. Run from a checked-out copy of the repo (boot.sh clones one
 # and execs this, and so does `ocd update` from a newer release). Safe to
 # re-run: every step is idempotent, and an existing features.json is left
-# untouched unless --features is given explicitly.
+# untouched (a v1 one is migrated to the single-switch schema in place).
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # /**
-#  * @version   1.2
+#  * @version   1.3
 #  * @package   Omarchy Classic Desktop (OCD)
 #  * @author    Fotis Evangelou
 #  * @url       https://github.com/fevangelou/ocd
@@ -38,11 +38,8 @@ ocd_hyprpm_repo_present() {
 }
 
 # hyprpm's per-user state dir (/var/cache/hyprpm/<user>/, holding
-# state.toml and the built plugin repos). Confirmed live, twice: hyprpm's
-# internal privilege escalation re-creates files here as root on *every*
-# build it does that needs its own header/state work, not just the very
-# first time ever — so a one-time `chown` is not a durable fix. This is
-# re-checked and re-applied on every enable attempt instead.
+# state.toml and the built plugin repos). Root-owned by design — see
+# ocd_hyprpm_can_escalate below for how hyprpm writes to it.
 OCD_HYPRPM_STATE_DIR="/var/cache/hyprpm/$(id -un)"
 
 # hyprpm mutates its state store through its OWN internal privilege
