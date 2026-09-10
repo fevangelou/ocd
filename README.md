@@ -82,7 +82,7 @@ Requires a live Omarchy 4.x session — the installer checks this itself and
 refuses to run on anything else.
 
 `boot.sh` never follows the `main` branch — it's pinned to the exact commit
-tagged for the current release (`v1.0` right now), fetched by that commit's
+tagged for the current release (`v1.3` right now), fetched by that commit's
 SHA and verified before anything runs. `main` can move ahead with
 in-progress work without changing what `curl | bash` installs; only cutting
 a new release tag does that.
