@@ -269,9 +269,23 @@ Item {
   }
 
   // Hot corner: a tiny always-present strip (independent of `opened`) in
-  // the top-right of each screen. Same trick as the dock's auto-hide hover
-  // strip — a near-invisible input region that survives the overlay being
-  // closed, because keepLoaded keeps this whole file resident.
+  // the bottom-right of each screen — a near-invisible input region that
+  // survives the overlay being closed, because keepLoaded keeps this whole
+  // file resident.
+  //
+  // 2x2px is enough precisely because it's a screen corner: the pointer
+  // stops dead there, so it can be hit by slamming the mouse without
+  // aiming. That only holds at the true corner, which is why this keeps
+  // ExclusionMode.Ignore (anchoring to the physical edge) rather than
+  // sitting above the dock's 26px reserved strip.
+  //
+  // It does therefore overlay the dock's bottom-right 2x2px, and it's on
+  // WlrLayer.Overlay so it wins that input. In practice the dock's right
+  // end is empty background — tabs are left-aligned and at least 90px
+  // wide, so they only reach the far corner with ~21+ windows open on a
+  // 1920px screen. Anchor `bottom` with `margins.bottom: 26` instead if
+  // that ever becomes a real conflict; it costs the slam-to-corner
+  // affordance.
   Variants {
     model: Quickshell.screens
 
@@ -286,7 +300,7 @@ Item {
       WlrLayershell.layer: WlrLayer.Overlay
       WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
       exclusionMode: ExclusionMode.Ignore
-      anchors { top: true; right: true }
+      anchors { bottom: true; right: true }
       implicitWidth: 2
       implicitHeight: 2
 
