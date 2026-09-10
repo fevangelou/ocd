@@ -252,5 +252,15 @@ JSON files don't get the comment header (no comment syntax in JSON).
 ## Repo / remote
 
 GitHub: `fevangelou/ocd` (`https://github.com/fevangelou/ocd`), branch
-`main`. No tagged releases yet — `boot.sh` defaults `OCD_REF` to `main`;
-override with `OCD_REF=some-branch` for testing an unmerged branch.
+`main`. Releases are annotated tags (`v1.0` … `v1.4`).
+
+`boot.sh` hardcodes the repository URL and one commit SHA, literally, in
+both the `fetch` and the `checkout --detach`, and neither is overridable
+from the environment. That is deliberate: an installer that can be pointed
+at another repository or a moving branch by setting a variable cannot be
+verified by reading the file, and the marketplace's security baseline
+rejects it (`remote-git-execution-unpinned`). Cutting a release means
+updating BOTH SHA occurrences together — they must always match.
+
+For development, don't reach for boot.sh: clone the repo and run
+`./install.sh`, or use `ocd update --main`.

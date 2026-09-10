@@ -73,11 +73,12 @@ on.
 Requires a live Omarchy 4.x session — the installer checks this itself and
 refuses to run on anything else.
 
-`boot.sh` never follows the `main` branch — it's pinned to the exact commit
-tagged for the current release (`v1.4` right now), fetched by that commit's
-SHA and verified before anything runs. `main` can move ahead with
-in-progress work without changing what `curl | bash` installs; only cutting
-a new release tag does that.
+`boot.sh` never follows the `main` branch. It hardcodes this repository's
+URL and the exact commit tagged for the current release (`v1.4` right now),
+fetches that commit by SHA and checks it out detached, in one fail-closed
+chain, before anything runs — and neither value can be overridden from the
+environment. `main` can move ahead with in-progress work without changing
+what `curl | bash` installs; only cutting a new release tag does that.
 
 ## Updating
 
