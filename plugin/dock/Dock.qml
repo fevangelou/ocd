@@ -122,9 +122,18 @@ Item {
     root.tabs = list
   }
 
+  // Secondary, startup-only gate. The real control is shell.json — `ocd
+  // apply` enables/disables this whole plugin — so this only matters if
+  // features.json is hand-edited without an apply. Reads either schema: a
+  // v1 file (four per-feature flags) counts as on unless every flag was
+  // off, matching ocd_features_migrate in lib/features.sh.
   Process {
     id: featureReadProc
-    command: ["jq", "-r", ".features.dock // true", root.configDir + "/features.json"]
+    command: ["jq", "-r",
+      'if has("enabled") then (.enabled != false) ' +
+      'else (((.features // {}) | length) == 0 ' +
+      'or (((.features // {}) | to_entries | map(.value) | any))) end',
+      root.configDir + "/features.json"]
     stdout: StdioCollector {
       onStreamFinished: root.dockFeatureEnabled = (String(text || "").trim() !== "false")
     }
@@ -258,7 +267,16 @@ Item {
       id: panel
       required property var modelData
       screen: modelData
-      visible: root.dockFeatureEnabled
+      // Hidden entirely when there's nothing to show, rather than sitting
+      // there as an empty 26px strip. `tabs` is pinned-but-not-running apps
+      // plus every toplevel, so an empty list genuinely means "no windows
+      // and no pins" — if you have pins, the dock stays put.
+      //
+      // This is a real hide, not a slide-away: with ExclusionMode.Auto,
+      // dropping `visible` also releases the reserved 26px back to the
+      // tiling area. A hover-to-reveal strip would be pointless here, since
+      // what it revealed would be the empty bar.
+      visible: root.dockFeatureEnabled && root.tabs.length > 0
       color: Util.alpha(Color.background, 0.97)
 
       WlrLayershell.namespace: "ocd-dock"
