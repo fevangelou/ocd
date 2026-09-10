@@ -111,10 +111,16 @@ check_sudo_for_missing_packages() {
 
     ocd_info "Missing required package(s): ${missing[*]}. ocd needs sudo once, up front, to install them via pacman — nothing else in this installer runs as root."
     if ocd_dry_run; then
-        printf '[dry-run] would run: sudo pacman -S --needed %s\n' "${missing[*]}" >&2
+        printf '[dry-run] would run: sudo pacman -S --needed --noconfirm %s\n' "${missing[*]}" >&2
         return 0
     fi
-    sudo pacman -S --needed "${missing[@]}"
+    # --noconfirm: under `curl | bash`, stdin is the already-drained pipe, not
+    # a terminal — pacman's own "Proceed with installation? [Y/n]" prompt
+    # gets immediate EOF and aborts the whole installer right here (confirmed
+    # live via a real user's curl|bash transcript: pacman printed the prompt
+    # and the shell returned before it could ever be answered). sudo's own
+    # password prompt is unaffected — it reads from /dev/tty, not stdin.
+    sudo pacman -S --needed --noconfirm "${missing[@]}"
 }
 
 run_preflight() {

@@ -23,6 +23,12 @@ OCD_HYPRLAND_PLUGINS_REPO="https://github.com/hyprwm/hyprland-plugins"
 OCD_HYPRBARS_OWNED_MARKER="$OCD_STATE_DIR/hyprbars-plugin-owned"
 OCD_HYPRPM_REPO_OWNED_MARKER="$OCD_STATE_DIR/hyprpm-repo-owned"
 
+# Whether the *running compositor* has hyprbars attached. This is the only
+# thing that actually matters to the user — and it is emphatically not the
+# same as "hyprpm exited 0". Confirmed live: hyprpm can print
+# "✔ built hyprbars into hyprbars/hyprbars.so" and "[ERR] Failed to write
+# plugin state" in the same run, exit successfully, and leave nothing
+# loaded.
 ocd_hyprbars_is_enabled() {
     hyprctl plugin list 2>/dev/null | grep -qi hyprbars
 }
@@ -39,6 +45,10 @@ ocd_hyprpm_repo_present() {
 # re-checked and re-applied on every enable attempt instead.
 OCD_HYPRPM_STATE_DIR="/var/cache/hyprpm/$(id -un)"
 
+ocd_hyprpm_state_writable() {
+    [[ -d "$OCD_HYPRPM_STATE_DIR" && -w "$OCD_HYPRPM_STATE_DIR" ]]
+}
+
 ocd_hyprpm_fix_ownership() {
     [[ -d "$OCD_HYPRPM_STATE_DIR" ]] || return 0
     find "$OCD_HYPRPM_STATE_DIR" -not -writable -print -quit 2>/dev/null | grep -q . || return 0
@@ -47,7 +57,29 @@ ocd_hyprpm_fix_ownership() {
         printf '[dry-run] would run: sudo chown -R "%s:%s" %s\n' "$(id -un)" "$(id -gn)" "$OCD_HYPRPM_STATE_DIR" >&2
         return 0
     fi
-    ocd_run "reclaim hyprpm state dir ownership" -- sudo chown -R "$(id -un):$(id -gn)" "$OCD_HYPRPM_STATE_DIR"
+    ocd_run "reclaim hyprpm state dir ownership" -- sudo chown -R "$(id -un):$(id -gn)" "$OCD_HYPRPM_STATE_DIR" || true
+}
+
+# Every hyprpm invocation goes through here. The ownership repair has to
+# run *after* each command as well as before it: hyprpm's internal
+# privilege escalation creates the state dir and the built artifacts as
+# root during the very command being run, so repairing only up front is
+# useless for the command that comes next.
+#
+# This is the actual root cause of both reported failures. On a brand-new
+# machine /var/cache/hyprpm/<user>/ does not exist yet, so a leading
+# ownership check is a silent no-op; `hyprpm add` then creates the whole
+# tree as root; and the `hyprpm enable` immediately after it cannot write
+# state.toml — "[ERR] Failed to write plugin state", no plugin loaded.
+# After a Hyprland upgrade the same thing happens by a different route:
+# the privileged header rebuild re-roots a tree that used to be fine.
+ocd_hyprpm() {
+    local desc="$1"; shift
+    ocd_hyprpm_fix_ownership
+    local rc=0
+    ocd_run "$desc" -- hyprpm "$@" || rc=$?
+    ocd_hyprpm_fix_ownership
+    return "$rc"
 }
 
 # hyprpm's very first invocation ever on a machine needs to create a
@@ -90,26 +122,32 @@ ocd_hyprbars_enable() {
     ocd_hyprpm_repo_present || repo_was_present=0
 
     ocd_info "Adding hyprland-plugins via hyprpm (repo add is a no-op if already present)..."
-    ocd_run "hyprpm add hyprland-plugins" -- hyprpm add "$OCD_HYPRLAND_PLUGINS_REPO" || true
+    ocd_hyprpm "hyprpm add hyprland-plugins" add "$OCD_HYPRLAND_PLUGINS_REPO" || true
+
+    # `hyprpm add` failing is not cosmetic: without the repo cloned,
+    # `hyprpm enable hyprbars` can only ever answer "Couldn't enable plugin
+    # (missing?)". The usual cause is stale headers ("Headers outdated,
+    # please run hyprpm update") on a state dir that was just created — so
+    # do what hyprpm's own message asks, then add again, before going near
+    # enable.
+    if ! ocd_dry_run && ! ocd_hyprpm_repo_present; then
+        ocd_warn "hyprpm has no hyprland-plugins repo after 'add' — usually outdated plugin headers. Running 'hyprpm update' to rebuild them, then retrying the add."
+        ocd_hyprpm "hyprpm update" update || true
+        ocd_hyprpm "hyprpm add hyprland-plugins (retry)" add "$OCD_HYPRLAND_PLUGINS_REPO" || true
+    fi
+
     if [[ "$repo_was_present" == "0" ]] && ! ocd_dry_run; then
         mkdir -p "$OCD_STATE_DIR"
         : >"$OCD_HYPRPM_REPO_OWNED_MARKER"
     fi
 
     ocd_info "Building and enabling hyprbars — this can take a few minutes..."
-    local ok=0
-    if ocd_run "hyprpm enable hyprbars" -- hyprpm enable hyprbars; then
-        ok=1
-    else
-        ocd_warn "hyprbars build failed. This is commonly stale plugin headers after a Hyprland upgrade — retrying once via 'hyprpm update'."
-        ocd_hyprpm_fix_ownership
-        ocd_run "hyprpm update" -- hyprpm update || true
-        ocd_hyprpm_fix_ownership
-        ocd_run "hyprpm enable hyprbars (retry)" -- hyprpm enable hyprbars && ok=1
-    fi
+    ocd_hyprpm "hyprpm enable hyprbars" enable hyprbars || true
+    ocd_hyprpm "hyprpm reload" reload -n || true
 
-    if [[ "$ok" == "1" ]]; then
-        ocd_run "hyprpm reload" -- hyprpm reload -n
+    # Deliberately not trusting hyprpm's exit code — see
+    # ocd_hyprbars_is_enabled. Ask the compositor what it actually loaded.
+    if ocd_dry_run || ocd_hyprbars_is_enabled; then
         if ! ocd_dry_run; then
             mkdir -p "$OCD_STATE_DIR"
             : >"$OCD_HYPRBARS_OWNED_MARKER"
@@ -117,12 +155,52 @@ ocd_hyprbars_enable() {
         return 0
     fi
 
-    ocd_warn "hyprbars still failed to build after 'hyprpm update'. Leaving window-controls disabled; every other ocd feature (mouse management, dock, Exposé) is unaffected and unchanged."
+    ocd_warn "hyprbars did not load. Retrying once via 'hyprpm update' — the common cause is plugin headers left stale by a Hyprland upgrade."
+    ocd_hyprpm "hyprpm update" update || true
+    ocd_hyprpm "hyprpm enable hyprbars (retry)" enable hyprbars || true
+    ocd_hyprpm "hyprpm reload (retry)" reload -n || true
+
+    if ocd_hyprbars_is_enabled; then
+        mkdir -p "$OCD_STATE_DIR"
+        : >"$OCD_HYPRBARS_OWNED_MARKER"
+        return 0
+    fi
+
+    # Distinguish the two failure modes rather than blaming the build for
+    # both — the ownership one is fixable in one command, and telling the
+    # user "build failed" when nothing failed to build sends them chasing
+    # a compiler problem that isn't there.
+    if ! ocd_hyprpm_state_writable; then
+        ocd_warn "hyprbars could not be enabled because hyprpm's state directory is root-owned and ocd could not reclaim it: $OCD_HYPRPM_STATE_DIR"
+        ocd_warn "hyprpm runs as you but re-creates that directory as root during its privileged builds, so it locks itself out. Fix it in a real terminal with:"
+        ocd_warn "    sudo chown -R $(id -un):$(id -gn) $OCD_HYPRPM_STATE_DIR && ocd apply"
+    else
+        ocd_warn "hyprbars still would not load after 'hyprpm update'. Check 'hyprpm list' and 'hyprctl plugin list' — if hyprpm reports the plugin as enabled but the compositor shows none loaded, 'hyprpm reload' in a terminal is worth one try."
+    fi
+    ocd_warn "Leaving window-controls disabled; every other ocd feature (mouse management, dock, Exposé) is unaffected and unchanged."
+    return 1
+}
+
+# hyprpm keeps its own per-repo record of which plugins are enabled,
+# separate from what the compositor has loaded. The two drift apart exactly
+# when an enable half-succeeds (built fine, state write or load failed), and
+# a disable that only consults `hyprctl plugin list` would then skip the
+# work and leave hyprpm permanently convinced hyprbars is on.
+ocd_hyprbars_state_enabled() {
+    local f
+    for f in "$OCD_HYPRPM_STATE_DIR"/*/state.toml; do
+        [[ -r "$f" ]] || continue
+        awk '
+            /^[[:space:]]*\[/ { in_hb = ($0 ~ /hyprbars/); next }
+            in_hb && /^[[:space:]]*enabled[[:space:]]*=[[:space:]]*true/ { found = 1 }
+            END { exit !found }
+        ' "$f" && return 0
+    done
     return 1
 }
 
 ocd_hyprbars_disable() {
-    if ! ocd_hyprbars_is_enabled; then
+    if ! ocd_hyprbars_is_enabled && ! ocd_hyprbars_state_enabled; then
         ocd_info "hyprbars already disabled"
         return 0
     fi
@@ -131,10 +209,9 @@ ocd_hyprbars_disable() {
     # also writes state.toml. Must not be fatal to the whole `ocd apply`
     # run: confirmed live, an unguarded failure here previously aborted
     # apply outright, before shell.json/feature reconciliation even ran.
-    ocd_hyprpm_fix_ownership
-    if ! ocd_run "hyprpm disable hyprbars" -- hyprpm disable hyprbars; then
+    if ! ocd_hyprpm "hyprpm disable hyprbars" disable hyprbars; then
         ocd_warn "hyprpm disable hyprbars failed. hyprbars may still be loaded; re-run 'ocd apply' to retry. Every other ocd feature is unaffected."
         return 1
     fi
-    ocd_run "hyprpm reload" -- hyprpm reload -n || true
+    ocd_hyprpm "hyprpm reload" reload -n || true
 }
