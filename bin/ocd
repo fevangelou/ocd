@@ -47,7 +47,7 @@ Usage: ocd <command> [args]
 
 Commands:
   apply                    Reconcile system state to ~/.config/omarchy/ocd/features.json
-  status                   Print the reconciled state
+  status                   Print the reconciled state (--full for raw plugin JSON)
   enable                   Turn ocd on in features.json (does not apply)
   disable                  Turn ocd off in features.json (does not apply)
   update                   Check for and install the latest published release
@@ -63,6 +63,10 @@ Flags (apply):
   --dry-run             Print every mutation, change nothing
   --notify              Send a desktop notification when apply finishes
                          (used by the settings panel; optional for CLI use)
+
+Flags (status):
+  --full                Also print the raw 'omarchy-shell shell listPlugins'
+                         JSON for every plugin on the system, not just ocd's
 
 Flags (update):
   --dry-run             Show what would be fetched/installed, change nothing
@@ -80,31 +84,68 @@ EOF
 }
 
 cmd_status() {
+    local full=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --full) full=1; shift ;;
+            *) ocd_die "unknown flag to 'ocd status': $1 (see --help)" ;;
+        esac
+    done
+
     ocd_features_init
     local installed_tag installed_sha
     installed_tag="$(ocd_installed_tag)"
     installed_sha="$(ocd_installed_sha)"
     if [[ -n "$installed_sha" ]]; then
-        echo "installed:         ${installed_tag:-<untagged>} ($installed_sha)"
+        printf '%-18s %s\n' "installed:" "${installed_tag:-<untagged>} ($installed_sha)"
     else
-        echo "installed:         unknown (no ${OCD_INSTALLED_REF_FILE#"$HOME"/} recorded)"
+        printf '%-18s %s\n' "installed:" "unknown (no ${OCD_INSTALLED_REF_FILE#"$HOME"/} recorded)"
     fi
-    echo "ocd state (from $OCD_FEATURES_FILE):"
-    ocd_features_print_status
-    echo
+    printf '%-18s %s\n' "enabled:" "$(ocd_enabled_get)"
+
     if command -v hyprctl >/dev/null 2>&1 && hyprctl version >/dev/null 2>&1; then
         if ocd_hyprbars_is_enabled; then
-            echo "hyprbars:          loaded"
+            printf '%-18s %s\n' "hyprbars:" "loaded"
         else
-            echo "hyprbars:          not loaded"
+            printf '%-18s %s\n' "hyprbars:" "not loaded"
         fi
     else
-        echo "hyprbars:          unknown (no live Hyprland session)"
+        printf '%-18s %s\n' "hyprbars:" "unknown (no live Hyprland session)"
     fi
-    if command -v omarchy-shell >/dev/null 2>&1 && omarchy-shell shell ping >/dev/null 2>&1; then
+
+    command -v omarchy-shell >/dev/null 2>&1 || return 0
+    omarchy-shell shell ping >/dev/null 2>&1 || return 0
+
+    local raw
+    raw="$(omarchy-shell shell listPlugins 2>/dev/null)"
+
+    # listPlugins emits every plugin on the system as a single JSON line, so
+    # this is summarised down to ocd's own three by default — the raw dump
+    # is thousands of characters of first-party plugin state nobody reading
+    # `ocd status` asked for. --full prints it (pretty-printed) for
+    # debugging.
+    if [[ "$full" == "1" ]]; then
         echo "shell plugin state (raw, from 'omarchy-shell shell listPlugins'):"
-        omarchy-shell shell listPlugins 2>/dev/null | grep -F "$OCD_PLUGIN_ID" || echo "  (no ocd plugin ids found — not installed or not scanned yet)"
+        printf '%s\n' "$raw" | jq . 2>/dev/null || printf '%s\n' "$raw"
+        return 0
     fi
+
+    local summary
+    summary="$(printf '%s' "$raw" | jq -r --arg p "$OCD_PLUGIN_ID" '
+        .[]
+        | select(.id | startswith($p + "."))
+        | [ (.id | ltrimstr($p + ".")), (if .enabled then "enabled" else "disabled" end) ]
+        | @tsv' 2>/dev/null)"
+
+    echo "shell plugins:"
+    if [[ -z "$summary" ]]; then
+        echo "  (no ocd plugin ids found — not installed or not scanned yet)"
+        return 0
+    fi
+    local name state
+    while IFS=$'\t' read -r name state; do
+        printf '  %-16s %s\n' "$name" "$state"
+    done <<<"$summary"
 }
 
 cmd_enable() {

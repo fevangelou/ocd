@@ -83,8 +83,3 @@ ocd_enabled_set() {
         '.schemaVersion = $sv | .enabled = $v' \
         --argjson sv "$OCD_SCHEMA_VERSION" --argjson v "$value"
 }
-
-ocd_features_print_status() {
-    ocd_features_init
-    printf '  %-18s %s\n' "enabled" "$(ocd_enabled_get)"
-}
