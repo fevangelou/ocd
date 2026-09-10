@@ -150,7 +150,7 @@ if hl.plugin and hl.plugin.hyprbars then
         bar_text_font = "sans-serif",
         bar_buttons_alignment = "right",
         bar_padding = 10,
-        bar_button_padding = 6,
+        bar_button_padding = 7,
         col = {
           text = "rgba(cdd6f4ff)",
         },
@@ -198,14 +198,14 @@ if hl.plugin and hl.plugin.hyprbars then
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(f38ba8ff)",
       fg_color = "rgba(1e1e2eff)",
-      size = 12,
+      size = 14,
       icon = "×",
       action = "hyprctl dispatch 'hl.dsp.window.close()'",
     })
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(f9e2afff)",
       fg_color = "rgba(1e1e2eff)",
-      size = 12,
+      size = 14,
       icon = "□",
       action = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
     })
@@ -215,7 +215,7 @@ if hl.plugin and hl.plugin.hyprbars then
     hl.plugin.hyprbars.add_button({
       bg_color = "rgba(a6e3a1ff)",
       fg_color = "rgba(1e1e2eff)",
-      size = 12,
+      size = 14,
       icon = "─",
       action = [[hyprctl dispatch 'hl.dsp.window.move({ workspace = "special:minimized", follow = false })']],
     })
