@@ -237,10 +237,6 @@ Did we mention it was live-built on Omarchy?
 
 ## Acknowledgements
 
-Thank you to [DHH](https://github.com/dhh) and the whole Omarchy community —
-without Omarchy itself and the welcoming, keyboard-driven desktop it
-introduced to so many newcomers, this mod wouldn't have a home to exist in.
-
 No code from any other plugin is vendored here, but two projects were read
 as prior art during research and are worth crediting directly:
 
